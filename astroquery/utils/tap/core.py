@@ -28,7 +28,7 @@ import requests
 
 __all__ = ['Tap', 'TapPlus']
 
-VERSION = "1.0.1"
+VERSION = "1.2.0"
 TAP_CLIENT_ID = "aqtappy-" + VERSION
 
 
@@ -38,7 +38,8 @@ class Tap(object):
     """
 
     def __init__(self, url=None, host=None, server_context=None,
-                 tap_context=None, port=80, sslport=443,
+                 tap_context=None, data_context=None, datalink_context=None,
+                 port=80, sslport=443,
                  default_protocol_is_https=False, connhandler=None,
                  verbose=False):
         """Constructor
@@ -53,6 +54,10 @@ class Tap(object):
             server context
         tap_context : str, optional, default None
             tap context
+        data_context : str, optional, default None
+            data context
+        datalink_context : str, optional, default None
+            datalink context
         port : int, optional, default '80'
             HTTP port
         sslport : int, optional, default '443'
@@ -73,6 +78,8 @@ class Tap(object):
                                              host,
                                              server_context,
                                              tap_context,
+                                             data_context,
+                                             datalink_context,
                                              port,
                                              sslport)
             else:
@@ -81,6 +88,8 @@ class Tap(object):
                                              host,
                                              server_context,
                                              tap_context,
+                                             data_context,
+                                             datalink_context,
                                              port,
                                              port)
         else:
@@ -88,6 +97,8 @@ class Tap(object):
                                          host,
                                          server_context,
                                          tap_context,
+                                         data_context,
+                                         datalink_context,
                                          port,
                                          sslport)
         # if connectionHandler is set, use it (useful for testing)
@@ -143,9 +154,9 @@ class Tap(object):
             addedItem = True
         print("Retrieving tables...")
         if flags != "":
-            response = self.__connHandler.execute_get("tables?"+flags)
+            response = self.__connHandler.execute_tapget("tables?"+flags)
         else:
-            response = self.__connHandler.execute_get("tables")
+            response = self.__connHandler.execute_tapget("tables")
         if verbose:
             print(response.status, response.reason)
         isError = self.__connHandler.check_launch_response_status(response,
@@ -221,7 +232,7 @@ class Tap(object):
             if verbose:
                 print("Redirect to %s", location)
             subcontext = self.__extract_sync_subcontext(location)
-            response = self.__connHandler.execute_get(subcontext)
+            response = self.__connHandler.execute_tapget(subcontext)
         job = Job(async_job=False, query=query, connhandler=self.__connHandler)
         isError = self.__connHandler.check_launch_response_status(response,
                                                                   verbose,
@@ -367,7 +378,7 @@ class Tap(object):
             print("No job identifier found")
             return None
         subContext = "async/" + str(jobid)
-        response = self.__connHandler.execute_get(subContext)
+        response = self.__connHandler.execute_tapget(subContext)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
@@ -399,7 +410,7 @@ class Tap(object):
         A list of Job objects
         """
         subContext = "async"
-        response = self.__connHandler.execute_get(subContext)
+        response = self.__connHandler.execute_tapget(subContext)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
@@ -465,7 +476,7 @@ class Tap(object):
         f.close()
         files = [[uploadTableName, uploadResource, chunk]]
         contentType, body = self.__connHandler.encode_multipart(args, files)
-        response = self.__connHandler.execute_post(context, body, contentType)
+        response = self.__connHandler.execute_tappost(context, body, contentType)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
@@ -482,7 +493,7 @@ class Tap(object):
         if name is not None:
             args['jobname'] = name
         data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_post(context, data)
+        response = self.__connHandler.execute_tappost(context, data)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
@@ -600,7 +611,8 @@ class TapPlus(Tap):
     """
 
     def __init__(self, url=None, host=None, server_context=None,
-                 tap_context=None, port=80, sslport=443,
+                 tap_context=None, data_context=None, datalink_context=None,
+                 port=80, sslport=443,
                  default_protocol_is_https=False, connhandler=None,
                  verbose=True):
         """Constructor
@@ -615,6 +627,10 @@ class TapPlus(Tap):
             server context
         tap_context : str, optional, default None
             tap context
+        data_context : str, optional, default None
+            data context
+        datalink_context : str, optional, default None
+            datalink context
         port : int, optional, default '80'
             HTTP port
         sslport : int, optional, default '443'
@@ -628,6 +644,7 @@ class TapPlus(Tap):
             flag to display information about the process
         """
         super(TapPlus, self).__init__(url, host, server_context, tap_context,
+                                      data_context, datalink_context,
                                       port, sslport, default_protocol_is_https,
                                       connhandler, verbose)
         self.__internalInit()
@@ -674,7 +691,7 @@ class TapPlus(Tap):
         """
         print("Retrieving table '"+str(table)+"'")
         connHandler = self.__getconnhandler()
-        response = connHandler.execute_get("tables?tables="+table)
+        response = connHandler.execute_tapget("tables?tables="+table)
         if verbose:
             print(response.status, response.reason)
         isError = connHandler.check_launch_response_status(response, verbose, 200)
@@ -687,6 +704,87 @@ class TapPlus(Tap):
         tsp.parseData(response)
         print("Done.")
         return tsp.get_table()
+
+    def load_data(self, ids, retrieval_type=None, format="VOTABLE", extra_args=None, verbose=False):
+        """Loads the specified table
+
+        Parameters
+        ----------
+        ids : str list, mandatory
+            list of identifiers
+        retrieval_type : str, mandatory
+            retrieval type identifier
+        format : str, mandatory, default value VOTABLE
+            output format type identifier
+        extra_args : str, optional
+            list of optional parameters (must be url enconded properly, without initial '&)
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A table object
+        """
+        if retrieval_type is None:
+            raise ValueError("Missing mandatory argument 'retrieval_type'")
+        if ids is None:
+            raise ValueError("Missing mandatory argument 'ids'")
+        print("Retrieving data.")
+        retrieval_type_arg = "RETRIEVAL_TYPE=" + str(retrieval_type)
+        ids_arg = "&ID=" + ','.join(ids)
+        format_arg = "&FORMAT=" + str(format)
+        if extra_args is not None:
+            data = "" + retrieval_type_arg + ids_arg + format_arg + "&" \
+                + extra_args
+        else:
+            data = "" + retrieval_type_arg + ids_arg + format_arg
+        if verbose:
+            print ("Data request: " + data)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_datapost(data=data)
+        if verbose:
+            print(response.status, response.reason)
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            print(response.status, response.reason)
+            raise requests.exceptions.HTTPError(response.reason)
+            return None
+        print("Done.")
+        results = utils.read_http_response(response, "votable")
+        return results
+
+    def load_datalinks(self, ids, verbose=False):
+        """Loads the specified table
+
+        Parameters
+        ----------
+        ids : str list, mandatory
+            list of identifiers
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A table object
+        """
+        print("Retrieving datalink.")
+        ids_arg = "ID=" + ','.join(ids)
+        if ids is None:
+            raise ValueError("Missing mandatory argument 'ids'")
+        if verbose:
+            print ("Datalink request: " + ids_arg)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_datalinkpost(subcontext="links", data=ids_arg)
+        if verbose:
+            print(response.status, response.reason)
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            print(response.status, response.reason)
+            raise requests.exceptions.HTTPError(response.reason)
+            return None
+        print("Done.")
+        results = utils.read_http_response(response, "votable")
+        return results
 
     def search_async_jobs(self, jobfilter=None, verbose=False):
         """Searches for jobs applying the specified filter
@@ -709,7 +807,7 @@ class TapPlus(Tap):
             if data is not None:
                 subContext = subContext + '?' + self.__appendData(data)
         connHandler = self.__getconnhandler()
-        response = connHandler.execute_get(subContext)
+        response = connHandler.execute_tapget(subContext)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
@@ -753,7 +851,7 @@ class TapPlus(Tap):
         data = "JOB_IDS=" + jobsIds
         subContext = "deletejobs"
         connHandler = self.__getconnhandler()
-        response = connHandler.execute_post(subContext, data)
+        response = connHandler.execute_tappost(subContext, data)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
