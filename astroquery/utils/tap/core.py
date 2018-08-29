@@ -532,8 +532,8 @@ class Tap(object):
         """
         self.__uploadTableMultipart(urlResource=url, uploadTableName=table_name, verbose=verbose)
 
-    def __uploadTableMultipart(self, fileResource=None, urlResource=None, uploadTableName,
-                               format, verbose):
+    def __uploadTableMultipart(self, fileResource=None, urlResource=None, uploadTableName=None,
+                               format="VOTable", verbose=False):
         uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
         if fileResource is None and urlResource is None:
             raise ValueError("Missing mandatory argument")
@@ -541,12 +541,16 @@ class Tap(object):
             raise ValueError("Found both parameters")
         if fileResource is not None:
             args = {
+                "TASKID": str(1535615093230),
+                "JOBID": "",
                 "TABLE_NAME": str(uploadTableName),
-                "FORMAT": ""+str(format)}
-            f = open(uploadResource, "r")
+                "TABLE_DESC": "description",
+                "FORMAT": ""+str(format),
+                "URL": ""}
+            f = open(fileResource, "r")
             chunk = f.read()
             f.close()
-            files = [['FILE', uploadResource, chunk]]
+            files = [['FILE', fileResource, chunk]]
             contentType, body = self.__connHandler.encode_multipart(args, files)
         else:
             args = {
@@ -555,6 +559,8 @@ class Tap(object):
             contentType, body = self.__connHandler.encode_multipart(args, files=None)
         response = self.__connHandler.execute_upload(body, contentType)
         if verbose:
+            print("contentType = " + contentType)
+            print("body = " + body)
             print(response.status, response.reason)
             print(response.getheaders())
         return response
@@ -579,13 +585,13 @@ class Tap(object):
             "TABLE_NAME": str(table_name),
             "DELETE": "true"}
         data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_upload(context, data)
+        response = self.__connHandler.execute_upload("", data)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
         return response
 
-        self.__uploadTableMultipart(urlResource=url, uploadTableName=table_name, verbose=verbose)
+        self.__uploadTableMultipart(urlResource="", uploadTableName=table_name, verbose=verbose)
 
     def __launchJob(self, query, outputFormat, context, verbose, name=None):
         args = {
