@@ -583,15 +583,16 @@ class Tap(object):
             raise ValueError("Table name cannot be null")
         args = {
             "TABLE_NAME": str(table_name),
-            "DELETE": "true"}
+            "DELETE": "TRUE"}
         data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_upload("", data)
+        response = self.__connHandler.execute_upload(data)
         if verbose:
+            print("data = " + str(data))
             print(response.status, response.reason)
             print(response.getheaders())
         return response
 
-        self.__uploadTableMultipart(urlResource="", uploadTableName=table_name, verbose=verbose)
+        self.__uploadTableMultipart(urlResource=None, uploadTableName=table_name, verbose=verbose)
 
     def __launchJob(self, query, outputFormat, context, verbose, name=None):
         args = {
