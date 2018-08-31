@@ -540,19 +540,19 @@ class Tap(object):
 
     def __uploadTableMultipart(self, fileResource=None, urlResource=None, uploadTableName=None,
                                format="VOTable", verbose=False):
-        uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
+        #uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
         if fileResource is None and urlResource is None:
             raise ValueError("Missing mandatory argument")
         if fileResource is not None and urlResource is not None:
             raise ValueError("Found both parameters")
         if fileResource is not None:
             args = {
-                "TASKID": str(1535615093230),
-                "JOBID": "",
+                "TASKID": str(1),
+                #"JOBID": "",
                 "TABLE_NAME": str(uploadTableName),
-                "TABLE_DESC": "description",
-                "FORMAT": ""+str(format),
-                "URL": ""}
+                #"TABLE_DESC": "description",
+                "FORMAT": ""+str(format)}
+                #"URL": ""}
             f = open(fileResource, "r")
             chunk = f.read()
             f.close()
