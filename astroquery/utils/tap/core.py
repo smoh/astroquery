@@ -38,7 +38,8 @@ class Tap(object):
     """
 
     def __init__(self, url=None, host=None, server_context=None,
-                 tap_context=None, data_context=None, datalink_context=None,
+                 tap_context=None, data_context=None, upload_context=None,
+                 datalink_context=None,
                  port=80, sslport=443,
                  default_protocol_is_https=False, connhandler=None,
                  verbose=False):
@@ -56,6 +57,8 @@ class Tap(object):
             tap context
         data_context : str, optional, default None
             data context
+        upload_context : str, optional, default 'Upload'
+            upload context
         datalink_context : str, optional, default None
             datalink context
         port : int, optional, default '80'
@@ -79,6 +82,7 @@ class Tap(object):
                                              server_context=server_context,
                                              tap_context=tap_context,
                                              data_context=data_context,
+                                             upload_context=upload_context,
                                              datalink_context=datalink_context,
                                              port=port,
                                              sslport=sslport)
@@ -89,6 +93,7 @@ class Tap(object):
                                              server_context=server_context,
                                              tap_context=tap_context,
                                              data_context=data_context,
+                                             upload_context=upload_context,
                                              datalink_context=datalink_context,
                                              port=port,
                                              sslport=port)
@@ -98,6 +103,7 @@ class Tap(object):
                                          server_context=server_context,
                                          tap_context=tap_context,
                                          data_context=data_context,
+                                         upload_context=upload_context,
                                          datalink_context=datalink_context,
                                          port=port,
                                          sslport=sslport)
@@ -585,14 +591,12 @@ class Tap(object):
             "TABLE_NAME": str(table_name),
             "DELETE": "TRUE"}
         data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_upload(data)
+        response = self.__connHandler.execute_upload(data,verbose=verbose)
         if verbose:
             print("data = " + str(data))
             print(response.status, response.reason)
             print(response.getheaders())
         return response
-
-        self.__uploadTableMultipart(urlResource=None, uploadTableName=table_name, verbose=verbose)
 
     def __launchJob(self, query, outputFormat, context, verbose, name=None):
         args = {
@@ -723,7 +727,8 @@ class TapPlus(Tap):
     """
 
     def __init__(self, url=None, host=None, server_context=None,
-                 tap_context=None, data_context=None, datalink_context=None,
+                 tap_context=None, data_context=None, upload_context='Upload',
+                 datalink_context=None,
                  port=80, sslport=443,
                  default_protocol_is_https=False, connhandler=None,
                  verbose=True):
@@ -741,6 +746,8 @@ class TapPlus(Tap):
             tap context
         data_context : str, optional, default None
             data context
+        upload_context : str, optional, default None
+            upload context
         datalink_context : str, optional, default None
             datalink context
         port : int, optional, default '80'
@@ -755,10 +762,12 @@ class TapPlus(Tap):
         verbose : bool, optional, default 'True'
             flag to display information about the process
         """
-        super(TapPlus, self).__init__(url, host, server_context, tap_context,
-                                      data_context, datalink_context,
-                                      port, sslport, default_protocol_is_https,
-                                      connhandler, verbose)
+        super(TapPlus, self).__init__(url, host, server_context=server_context, tap_context=tap_context,
+                                      data_context=data_context, upload_context=upload_context, 
+                                      datalink_context=datalink_context,
+                                      port=port, sslport=sslport, 
+                                      default_protocol_is_https=default_protocol_is_https,
+                                      connhandler=connhandler, verbose=verbose)
         self.__internalInit()
 
     def __internalInit(self):
