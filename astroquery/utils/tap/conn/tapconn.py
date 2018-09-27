@@ -238,6 +238,9 @@ class TapConn(object):
 
     def __execute_get(self, context, verbose=False):
         conn = self.__get_connection(verbose)
+        if verbose:
+            print("host = " + str(conn.host) + ":" + str(conn.port))
+            print("context = "+ context)
         conn.request("GET", context, None, self.__getHeaders)
         response = conn.getresponse()
         self.__currentReason = response.reason
@@ -300,7 +303,7 @@ class TapConn(object):
         Parameters
         ----------
         subcontext : str, mandatory
-            datalink subcontext
+            datalink subcontext (e.g. 'capabilities', 'availability', 'links', etc.)
         data : str, mandatory
             POST data
         content_type: str, optional, default 'application/x-www-form-urlencoded'
@@ -367,6 +370,7 @@ class TapConn(object):
                      content_type=CONTENT_TYPE_POST_DEFAULT, verbose=False):
         conn = self.__get_connection(verbose)
         if verbose:
+            print("host = " + str(conn.host) + ":" + str(conn.port))
             print("context = "+ context)
             print("Content-type = " + str(content_type))
         self.__postHeaders["Content-type"] = content_type
