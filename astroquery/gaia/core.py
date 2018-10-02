@@ -993,25 +993,6 @@ class GaiaClass(object):
         return self.__gaiatap.share_group_delete_user(group_name=group_name,
                                                       user_id=user_id,
                                                       verbose=verbose)
-      
-<<<<<<< HEAD
-    def load_user(self, user_id, verbose=False):
-        """Loads the specified user
-        TAP+ only
 
-        Parameters
-        ----------
-        user_id : str, mandatory
-            user id to load
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A user
-        """
-        
-=======
->>>>>>> branch 'tap_1_2' of https://github.com/esdc-esac-esa-int/astroquery
 
 Gaia = GaiaClass()
