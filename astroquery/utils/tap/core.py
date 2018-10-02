@@ -1440,6 +1440,107 @@ class TapPlus(Tap):
             print(response.status, response.reason)
             print(response.getheaders())
 
+    def share_group_add_user(self,
+                             group_name=None,
+                             user_id=None,
+                             verbose=False):
+        """Adds user to a group
+
+        Parameters
+        ----------
+        group_name: str, required
+            group which user_id will be added in
+        user_id: str, required
+            user id to be added
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+        if group_name is None or user_id is None:
+            raise ValueError("Both 'group_name' and 'user_id' must be specified")
+        
+        group = self.load_group(group_name, verbose)
+        if group is None:
+            raise ValueError("Group " + group_name + " doesn't exist")
+        user_found_in_group = False     
+        for u in group.get_users():
+            if str(u.get_id()) == user_id:
+                user_found_in_group = True
+                break
+        
+        if user_found_in_group == True:
+            raise ValueError("User id " + str(user_id) + " found in group " + str(group_name))
+        
+        users = ""
+        for u in group.get_users():
+            users = users + u.get_id() + ","
+        users = users + user_id
+        
+        data = ("action=CreateOrUpdateGroup&group_id=" + 
+                str(group.get_id()) + "&title=" +
+                str(group.get_title()) + "&description=" +
+                str(group.get_description()) + "&users_list=" +
+                str(users))
+        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+
+    def share_group_delete_user(self,
+                                group_name=None,
+                                user_id=None,
+                                verbose=False):
+        """Deletes user from a group
+
+        Parameters
+        ----------
+        group_name: str, required
+            group which user_id will be removed from
+        user_id: str, required
+            user id to be deleted
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+        if group_name is None or user_id is None:
+            raise ValueError("Both 'group_name' and 'user_id' must be specified")
+        
+        group = self.load_group(group_name, verbose)
+        if group is None:
+            raise ValueError("Group " + group_name + " doesn't exist")
+        user_found_in_group = False     
+        for u in group.get_users():
+            if str(u.get_id()) == user_id:
+                user_found_in_group = True
+                break
+        
+        if user_found_in_group == False:
+            raise ValueError("User id " + str(user_id) + " not found in group " + str(group_name))
+        
+        users = ""
+        for u in group.get_users():
+            if str(u.get_id()) == str(user_id):
+                continue
+            users = users + u.get_id() + ","
+        if str(users) != "":
+            users = users[:-1]
+              
+        data = ("action=CreateOrUpdateGroup&group_id=" + 
+                str(group.get_id()) + "&title=" +
+                str(group.get_title()) + "&description=" +
+                str(group.get_description()) + "&users_list=" +
+                str(users))
+        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+
     def get_datalinks(self, ids, verbose=False):
         """Gets datalinks associated to the provided identifiers
 

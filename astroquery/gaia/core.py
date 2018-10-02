@@ -901,7 +901,7 @@ class GaiaClass(object):
         -------
         A message (OK/Error) or a job when the table is big
         """
-        self.__gaiatap.share_table_stop(table_name=table_name,
+        return self.__gaiatap.share_table_stop(table_name=table_name,
                                         verbose=verbose)
         
     def share_group_create(self,
@@ -923,7 +923,7 @@ class GaiaClass(object):
         -------
         A message (OK/Error) or a job when the table is big
         """
-        self.__gaiatap.share_group_create(group_name=group_name,
+        return self.__gaiatap.share_group_create(group_name=group_name,
                                           description=description,
                                           verbose=verbose)
     
@@ -943,8 +943,54 @@ class GaiaClass(object):
         -------
         A message (OK/Error) or a job when the table is big
         """
-        self.__gaiatap.share_group_delete(group_name=group_name,
+        return self.__gaiatap.share_group_delete(group_name=group_name,
                                           verbose=verbose)
 
+    def share_group_add_user(self,
+                             group_name=None,
+                             user_id=None,
+                             verbose=False):
+        """Adds user to a group
+
+        Parameters
+        ----------
+        group_name: str, required
+            group which user_id will be added in
+        user_id: str, required
+            user id to be added
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+        return self.__gaiatap.share_group_add_user(group_name=group_name,
+                                                   user_id=user_id,
+                                                   verbose=verbose)
+      
+    def share_group_delete_user(self,
+                                group_name=None,
+                                user_id=None,
+                                verbose=False):
+        """Deletes user from a group
+
+        Parameters
+        ----------
+        group_name: str, required
+            group which user_id will be removed from
+        user_id: str, required
+            user id to be deleted
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+        return self.__gaiatap.share_group_delete_user(group_name=group_name,
+                                                      user_id=user_id,
+                                                      verbose=verbose)
+      
 
 Gaia = GaiaClass()
