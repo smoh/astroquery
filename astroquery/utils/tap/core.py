@@ -1511,9 +1511,12 @@ class TapPlus(Tap):
         if user_found_in_group == True:
             raise ValueError("User id " + str(user_id) + " found in group " + str(group_name))
         
+<<<<<<< HEAD
         if self.is_valid_user(user_id, verbose) == False:
             raise ValueError("User id " + str(user_id) + " not found in LDAP")
 
+=======
+>>>>>>> branch 'tap_1_2' of https://github.com/esdc-esac-esa-int/astroquery
         users = ""
         for u in group.get_users():
             users = users + u.get_id() + ","

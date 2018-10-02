@@ -994,6 +994,7 @@ class GaiaClass(object):
                                                       user_id=user_id,
                                                       verbose=verbose)
       
+<<<<<<< HEAD
     def load_user(self, user_id, verbose=False):
         """Loads the specified user
         TAP+ only
@@ -1010,5 +1011,7 @@ class GaiaClass(object):
         A user
         """
         
+=======
+>>>>>>> branch 'tap_1_2' of https://github.com/esdc-esac-esa-int/astroquery
 
 Gaia = GaiaClass()
