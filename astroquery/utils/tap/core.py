@@ -29,6 +29,7 @@ from astroquery.utils.tap.model.filter import Filter
 import six
 import requests
 from sympy.tensor import indexed
+import getpass
 
 
 __all__ = ['Tap', 'TapPlus']
@@ -1720,11 +1721,15 @@ class TapPlus(Tap):
                 user = ins.readline().strip()
                 password = ins.readline().strip()
         if user is None:
-            print("Invalid user name")
-            return
+            user = six.moves.input("User: ")
+            if user is None:
+                print("Invalid user name")
+                return
         if password is None:
-            print("Invalid password")
-            return
+            password = getpass.getpass()
+            if password is None:
+                print("Invalid password")
+                return
         self.__user = str(user)
         self.__pwd = str(password)
         self.__dologin(verbose)
@@ -1766,6 +1771,7 @@ class TapPlus(Tap):
             if cookie is not None:
                 self.__isLoggedIn = True
                 connHandler.set_cookie(cookie)
+        print("OK")
 
     def logout(self, verbose=False):
         """Performs a logout
