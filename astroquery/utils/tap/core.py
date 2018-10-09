@@ -30,6 +30,7 @@ import six
 import requests
 from sympy.tensor import indexed
 import getpass
+import os
 
 
 __all__ = ['Tap', 'TapPlus']
@@ -186,8 +187,9 @@ class Tap(object):
             print(response.status, response.reason)
         isError = self.__connHandler.check_launch_response_status(response, verbose, 200)
         if isError:
-            print(response.status, response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         print("Parsing table '"+str(table)+"'...")
         tsp = TableSaxParser()
@@ -234,8 +236,9 @@ class Tap(object):
                                                                   verbose,
                                                                   200)
         if isError:
-            print(response.status, response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         print("Parsing tables...")
         tsp = TableSaxParser()
@@ -320,9 +323,11 @@ class Tap(object):
         if isError:
             job.set_failed(True)
             job.set_phase('ERROR')
+            responseBytes = response.read()
+            responseStr = responseBytes.decode('utf-8')
             if dump_to_file:
-                self.__connHandler.dump_to_file(suitableOutputFile, response)
-            raise requests.exceptions.HTTPError(response.reason)
+                self.__connHandler.dump_to_file(suitableOutputFile, responseStr)
+            raise requests.exceptions.HTTPError(taputils.parse_http_response_error(responseStr, response.status))
         else:
             if verbose:
                 print("Retrieving sync. results...")
@@ -409,7 +414,9 @@ class Tap(object):
             job.set_failed(True)
             job.set_phase('ERROR')
             if dump_to_file:
-                self.__connHandler.dump_to_file(suitableOutputFile, response)
+                responseBytes = response.read()
+                responseStr = responseBytes.decode('utf-8')
+                self.__connHandler.dump_to_file(suitableOutputFile, responseStr)
             raise requests.exceptions.HTTPError(response.reason)
         else:
             location = self.__connHandler.find_header(
@@ -469,8 +476,9 @@ class Tap(object):
                                                                   verbose,
                                                                   200)
         if isError:
-            print(response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         # parse job
         jsp = JobSaxParser(async_job=True)
@@ -501,8 +509,9 @@ class Tap(object):
                                                                   verbose,
                                                                   200)
         if isError:
-            print(response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         # parse jobs
         jsp = JobListSaxParser(async_job=True)
@@ -534,7 +543,7 @@ class Tap(object):
         verbose : bool, optional, default 'False'
             flag to display information about the process
         """
-        job.save_results()
+        job.save_results(verbose=verbose)
 
     def __getJobId(self, location):
         pos = location.rfind('/')+1
@@ -559,7 +568,7 @@ class Tap(object):
         f = open(uploadResource, "r")
         chunk = f.read()
         f.close()
-        files = [[uploadTableName, uploadResource, chunk]]
+        files = [[uploadTableName, os.path.basename(uploadResource), chunk]]
         contentType, body = self.__connHandler.encode_multipart(args, files)
         response = self.__connHandler.execute_tappost(context, body, contentType)
         if verbose:
@@ -567,405 +576,6 @@ class Tap(object):
             print(response.getheaders())
         return response
 
-    def upload_table(self, upload_resource=None, table_name=None, 
-                     table_description=None,
-                     format=None, verbose=False):
-        """Uploads a table to the  user private space
-
-        Parameters
-        ----------
-        upload_resource : str, mandatory
-            table to be uploaded. File or URL.
-        table_name: str, required if uploadResource is provided, default None
-            resource temporary table name associated to the uploaded resource
-        table_description: str, optional, default None
-            table description
-        format : str, optional, default 'VOTable'
-            results format
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
-        """
-
-        if upload_resource is None:
-            raise ValueError("Missing mandatory argument 'upload_resource'")
-        if table_name is None:
-            raise ValueError("Missing mandatory argument 'table_name'")
-        if table_description is None:
-            table_description = ""
-
-        if format is None:
-            if (str(upload_resource).startswith("http") and 
-                (str(upload_resource).endswith(".vot") or 
-                 str(upload_resource).endswith(".votable"))):
-                format = "VOTable"
-
-        self.__uploadTableMultipart(resource=upload_resource, table_name=table_name, 
-                                    table_description=table_description, format=format, 
-                                    verbose=verbose)
-
-    def __uploadTableMultipart(self, resource, table_name=None, table_description=None,
-                               format="VOTable", verbose=False):
-        if not (str(resource).startswith("http")):  # upload from file
-            args = {
-                "TASKID": str(1),
-                "TABLE_NAME": str(table_name),
-                "TABLE_DESC": str(table_description),
-                "FORMAT": str(format)}
-            f = open(resource, "r")
-            chunk = f.read()
-            f.close()
-            files = [['FILE', resource, chunk]]
-            contentType, body = self.__connHandler.encode_multipart(args, files)
-        else:    # upload from URL
-            args = {
-                "TASKID": str(1),
-                "TABLE_NAME": str(table_name),
-                "TABLE_DESC": str(table_description),
-                "FORMAT": str(format),
-                "URL": str(resource)}
-            files = [['FILE', "", ""]]
-            contentType, body = self.__connHandler.encode_multipart(args, files)
-            
-        response = self.__connHandler.execute_upload(body, contentType)
-        if response.status == 303:
-            pass
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        return response
-
-    def upload_table_from_job(self, job=None,
-                     verbose=False):
-        """Creates a table to the user private space from a job
-
-        Parameters
-        ----------
-        job: job, mandatory
-            job used to create a table. Could be a string with the jobid or 
-            a job itself
-        table_name: str, required if uploadResource is provided, default None
-            resource temporary table name associated to the uploaded resource
-        table_description: str, optional, default None
-            table description
-        verbose: bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
-        """
-
-        if job is None:
-            raise ValueError("Missing mandatory argument 'job'")
-        
-        if isinstance(job, Job):
-            j = job
-        else:
-            j = self.load_async_job(job)
-            if j is None:
-                raise ValueError("Job " + str(job) + " not found")
-                return
-
-        if verbose:
-            print("JOB = " + j.get_jobid())
-        self.__uploadTableMultipartFromJob(resource=j.get_jobid(), table_name="t" + str(j.get_jobid()), 
-                                    table_description=j.get_query(), 
-                                    verbose=verbose)
-    
-    def __uploadTableMultipartFromJob(self, resource, table_name=None, table_description=None,
-                                      verbose=False):
-        args = {
-            "TASKID": str(1),
-            "JOBID": str(resource),
-            "TABLE_NAME": str(table_name),
-            "TABLE_DESC": str(table_description),
-            "FORMAT": str(format)}
-        files = [['FILE', "", ""]]
-        contentType, body = self.__connHandler.encode_multipart(args, files)
-            
-        response = self.__connHandler.execute_upload(body, contentType)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        return response
-
-    def delete_user_table(self, table_name=None, force_removal=False, verbose=False):
-        """Removes a user table
-
-        Parameters
-        ----------
-        table_name: str, required
-            table to be removed
-        force_removal : bool, optional, default 'False'
-            flag to indicate if removal should be forced
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
-        """
-        if table_name is None:
-            raise ValueError("Table name cannot be null")
-        if force_removal == True:
-            args = {
-                    "TABLE_NAME": str(table_name),
-                    "DELETE": "TRUE",
-                    "FORCE_REMOVAL": "TRUE"}
-        else:
-            args = {
-                    "TABLE_NAME": str(table_name),
-                    "DELETE": "TRUE",
-                    "FORCE_REMOVAL": "FALSE"}
-        data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_upload(data,verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        return response
-    
-    def update_user_table(self, table_name=None, list_of_changes=[], 
-                          verbose=False):
-        """Updates a user table
-
-        Parameters
-        ----------
-        table_name: str, required
-            table to be updated
-        list_of_changes: list, required
-            list of lists, each one of them containing sets of 
-            [column_name, field_name, value]. 
-            column_name is the name of the column to be updated
-            field_name is the name of the tap field to be modified
-            field name can be 'utype', 'ucd', 'flags' or 'indexed'
-            value is the new value this field of this column will take
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
-        """
-        if table_name is None:
-            raise ValueError("Table name cannot be null")
-        if list_of_changes is None:
-            raise ValueError("List of changes cannot be null")
-        if len(list_of_changes) == 0:
-            raise ValueError("List of changes cannot be empty")
-        for change in list_of_changes:
-            if change is None:
-                raise ValueError("None of the changes can be null")
-            if len(change) != 3: #  [column_name, field_name, value]
-                raise ValueError("All of the changes must have three "\
-                                 "elements: [column_name, field_name, value]")
-            index = 0
-            for value in change:
-                if value is None:
-                    raise ValueError("None of the values for the changes"\
-                                     " can be null")
-                if (index == 1 and value != 'utype' and value != 'ucd' 
-                    and value != 'flags' and value != 'indexed'):
-                    raise ValueError("Position 2 of all changes must be "\
-                                     "'utype', 'ucd', 'flags' or 'indexed'")
-                index = index + 1
-
-        table = self.load_table(table=table_name, verbose=verbose)
-        if table is None:
-            raise ValueError("Table name not found")
-        columns = table.get_columns()
-        if len(columns) == 0:
-            raise ValueError("Table has no columns")
-
-        for change in list_of_changes:
-            index = 0
-            for value in change:
-                if (index == 0):
-                    found = False
-                    for c in columns:
-                        if c.get_name() == value:
-                            found = True
-                            break
-                    if found == False:
-                        raise ValueError("Column name introduced "
-                                          + str(value)
-                                          + " was not found in the table")
-                index = index + 1
-        
-        currentColumnRa = self.__columnsContainFlag(columns, "Ra")
-        currentColumnDec = self.__columnsContainFlag(columns, "Dec")
-            
-        newColumnRa = self.__changesContainFlag(list_of_changes, "Ra")
-        newColumnDec = self.__changesContainFlag(list_of_changes, "Dec")
-                    
-        if currentColumnRa is None and currentColumnDec is None:#  None of them are in place
-            if ((newColumnRa is not None and newColumnDec is None) or
-                (newColumnRa is None and newColumnDec is not None)):
-                raise ValueError("Both Ra and Dec must be specified when updating "\
-                                 "one of them.")
-            
-        if ((currentColumnRa is None and currentColumnDec is not None) or
-            (currentColumnRa is not None and currentColumnDec is None)):#  Only one of them is present
-            raise ValueError("One of (Ra, Dec) is not present but the other is. "\
-                             "Wrong initial configuration of the table.")
-            
-        if currentColumnRa is not None and currentColumnDec is not None:#  Both are initially present
-            if newColumnRa is not None or newColumnDec is not None:
-                raise ValueError("Both Ra and Dec are already present in this table. "\
-                                 "Only one of each is allowed.")
-
-        
-        num_cols = len(columns)
-        
-        args = {
-                "ACTION": "edit",
-                "NUMTABLES": str(1),
-                "TABLE0_NUMCOLS": str(num_cols),
-                "TABLE0": str(table_name),
-                }        
-        
-        index = 0
-        for column in columns:
-            found_in_changes = False
-            for change in list_of_changes:
-                if (str(change[0]) == str(column.get_name())):
-                    found_in_changes = True
-                    break
-            column_name = column.get_name()
-            flags = column.get_flags()
-            if str(flags) == '1':
-                flags = 'Ra'
-            elif str(flags) == '2':
-                flags = 'Dec'
-            elif str(flags) == '4':
-                flags = 'Flux'
-            elif str(flags) == '8':
-                flags = 'Mag'
-            elif str(flags) == '16':
-                flags = 'PK'
-            elif str(flags) == '33':
-                flags = 'Ra'
-            elif str(flags) == '34':
-                flags = 'Dec'
-            elif str(flags) == '38':
-                flags = 'Flux'
-            elif str(flags) == '40':
-                flags = 'Mag'
-            elif str(flags) == '48':
-                flags = 'PK'
-            else:
-                flags = None
-            indexed = (str(column.get_flag()) == 'indexed'
-                       or str(flags) == 'Ra'
-                       or str(flags) == 'Dec'
-                       or str(flags) == 'PK')
-            ucd = str(column.get_ucd())
-            utype = str(column.get_utype())
-            if found_in_changes:
-                for change in list_of_changes:
-                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'flags':
-                        flags = str(change[2])
-                        break
-                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'indexed':
-                        indexed = str(change[2])
-                        break
-                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'ucd':
-                        ucd = str(change[2])
-                        break
-                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'utype':
-                        utype = str(change[2])
-                        break
-            if flags == 'Ra' or flags == 'Dec' or flags == 'PK':
-                indexed = str(True)
-            args["TABLE0_COL" + str(index)] = str(column_name)                
-            args["TABLE0_COL" + str(index) + "_FLAGS"] = str(flags)
-            args["TABLE0_COL" + str(index) + "_INDEXED"] = str(indexed)
-            args["TABLE0_COL" + str(index) + "_UCD"] = str(ucd)
-            args["TABLE0_COL" + str(index) + "_UTYPE"] = str(utype)
-            index = index + 1
-
-        data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_table_edit(data,verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        return response
-
-    def set_ra_dec_columns(self, table_name=None,
-                           ra_column_name=None, dec_column_name=None,
-                           verbose=False):
-        """Set columns of a table as ra and dec respectively a user table
-
-        Parameters
-        ----------
-        table_name: str, required
-            table to be set
-        ra_column_name: str, required
-            ra column to be set
-        dec_column_name: str, required
-            dec column to be set
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
-        """
-
-        if table_name is None:
-            raise ValueError("Table name cannot be null")
-        if ra_column_name is None:
-            raise ValueError("Ra column name cannot be null")
-        if dec_column_name is None:
-            raise ValueError("Dec column name cannot be null")
-
-        args = {
-                "ACTION": "radec",
-                "TABLE_NAME": str(table_name),
-                "RA": str(ra_column_name),
-                "DEC": str(dec_column_name),
-                }
-        data = self.__connHandler.url_encode(args)
-        return self.__connHandler.execute_table_edit(data,verbose=verbose)
-
-    def __columnsContainFlag(self, columns=None, flag=None, verbose=False):
-        c = None;
-        if (columns is not None and len(columns) > 0):
-            for column in columns:
-                f = column.get_flags()
-                if str(f) == '1' or str(f) == '33':
-                    f = 'Ra'
-                elif str(f) == '2' or str(f) == '34':
-                    f = 'Dec'
-                elif str(f) == '4' or str(f) == '38':
-                    f = 'Flux'
-                elif str(f) == '8' or str(f) == '40':
-                    f = 'Mag'
-                elif str(f) == '16' or str(f) == '48':
-                    f = 'PK'
-                else:
-                    f = None
-                if str(flag) == str(f):
-                    c = column.get_name()
-                    break
-        return c
-    
-    def __changesContainFlag(self, changes=None, flag=None, verbose=False):
-        c = None;
-        if (changes is not None and len(changes) > 0):
-            for change in changes:
-                if str(change[1]) == "flags":
-                    value = str(change[2])
-                    if str(flag) == str(value):
-                        c = str(change[0])
-                        break
-        return c
-
-    
-        
     def __launchJob(self, query, outputFormat, context, verbose, name=None,
                     autorun=True):
         args = {
@@ -1212,8 +822,9 @@ class TapPlus(Tap):
             print(response.status, response.reason)
         isError = connHandler.check_launch_response_status(response, verbose, 200)
         if isError:
-            print(response.status, response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         print("Done.")
         if 'format' in params_dict:
@@ -1239,10 +850,17 @@ class TapPlus(Tap):
         A set of groups of a user
         """
         context = "share?action=GetGroups"
-        response = self.__getconnhandler().execute_tapget(context,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_tapget(context,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
             
         print("Parsing groups...")
         gsp = GroupSaxParser()
@@ -1291,10 +909,17 @@ class TapPlus(Tap):
         A set of shared items
         """
         context = "share?action=GetSharedItems"
-        response = self.__getconnhandler().execute_tapget(context,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_tapget(context,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
             
         print("Parsing shared items...")
         ssp = SharedItemsSaxParser()
@@ -1341,13 +966,25 @@ class TapPlus(Tap):
                    str(description) +
                    "&items_list=" +
                    group.get_id() + "|Group|Read")
-        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_share(data,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Shared table '"+str(table_name)+"' to group '"+str(group_name)+"'."
+        print(msg)
+        return msg
+
             
     def share_table_stop(self,
                     table_name=None,
+                    group_name=None,
                     verbose=False):
         """Stop sharing a table
 
@@ -1355,6 +992,8 @@ class TapPlus(Tap):
         ----------
         table_name: str, required
             table to be stopped from being shared
+        group_name: str, required
+            group where the table is shared to
         verbose : bool, optional, default 'False'
             flag to display information about the process
 
@@ -1364,7 +1003,7 @@ class TapPlus(Tap):
         """
         if table_name is None:
             raise ValueError("'table_name' must be specified")
-        
+        # TODO determine the right group
         shared_items = self.load_shared_items(verbose)
         shared_item = None
         for s in shared_items:
@@ -1377,10 +1016,20 @@ class TapPlus(Tap):
         data = ("action=RemoveItem&resource_type=0&resource_id=" + 
                    str(shared_item.get_id()) +
                    "&resource_type=0")
-        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_share(data,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Stop sharing table '"+str(table_name)+"' to group '"+str(group_name)+"'."
+        print(msg)
+        return msg
             
     def share_group_create(self,
                     group_name=None,
@@ -1414,10 +1063,20 @@ class TapPlus(Tap):
                    str(group_name) +
                    "&description=" +
                    str(description))
-        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_share(data,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Created group '"+str(group_name)+"'."
+        print(msg)
+        return msg
 
     def share_group_delete(self,
                     group_name=None,
@@ -1445,10 +1104,20 @@ class TapPlus(Tap):
             
         data = ("action=RemoveGroup&resource_type=0&group_id=" + 
                    str(group.get_id()))
-        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_share(data,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Deleted group '"+str(group_name)+"'."
+        print(msg)
+        return msg
 
     def share_group_add_user(self,
                              group_name=None,
@@ -1485,7 +1154,8 @@ class TapPlus(Tap):
             raise ValueError("User id " + str(user_id) + " found in group " + str(group_name))
         
         if self.is_valid_user(user_id, verbose) == False:
-            raise ValueError("User id " + str(user_id) + " not found in LDAP")
+            # raise ValueError("User id " + str(user_id) + " not found in LDAP")
+            print("Warning: user id '" + str(user_id)+ "' not found.")
 
         users = ""
         for u in group.get_users():
@@ -1497,10 +1167,20 @@ class TapPlus(Tap):
                 str(group.get_title()) + "&description=" +
                 str(group.get_description()) + "&users_list=" +
                 str(users))
-        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_share(data,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Added user '"+str(user_id)+"' from group '"+str(group_name)+"'."
+        print(msg)
+        return msg
 
     def share_group_delete_user(self,
                                 group_name=None,
@@ -1549,10 +1229,20 @@ class TapPlus(Tap):
                 str(group.get_title()) + "&description=" +
                 str(group.get_description()) + "&users_list=" +
                 str(users))
-        response = self.__getconnhandler().execute_share(data,verbose=verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_share(data,verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Deleted user '"+str(user_id)+"' from group '"+str(group_name)+"'."
+        print(msg)
+        return msg
 
     def is_valid_user(self, user_id=None, verbose=False):
         """Determines if the specified user is valid
@@ -1573,11 +1263,17 @@ class TapPlus(Tap):
             raise ValueError("'user_id' must be specified")
         
         context = "?USER=" + str(user_id)
-        response = self.__getconnhandler().execute_users(context,verbose)
+        connHandler = self.__getconnhandler()
+        response = connHandler.execute_users(context,verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
-        
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None        
         user = str(response.read())
         if verbose:
             print("USER response = " + str(user))
@@ -1616,8 +1312,9 @@ class TapPlus(Tap):
             print(response.status, response.reason)
         isError = connHandler.check_launch_response_status(response, verbose, 200)
         if isError:
-            print(response.status, response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         print("Done.")
         results = utils.read_http_response(response, "votable")
@@ -1652,8 +1349,9 @@ class TapPlus(Tap):
                                                            verbose,
                                                            200)
         if isError:
-            print(response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
             return None
         # parse jobs
         jsp = JobSaxParser(async_job=True)
@@ -1694,8 +1392,12 @@ class TapPlus(Tap):
             print(response.getheaders())
         isError = connHandler.check_launch_response_status(response, verbose, 200)
         if isError:
-            print(response.reason)
-            raise requests.exceptions.HTTPError(response.reason)
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+        msg = "Removed jobs: '"+str(jobs_list)+"'."
+        print(msg)
+        return msg
 
     def login(self, user=None, password=None, credentials_file=None,
               verbose=False):
@@ -1765,15 +1467,16 @@ class TapPlus(Tap):
                                                            verbose,
                                                            200)
         if isError:
-            print("Login error: " + str(response.reason))
-            raise requests.exceptions.HTTPError("Login error: " + str(response.reason))
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
         else:
             # extract cookie
             cookie = self._Tap__findCookieInHeader(response.getheaders())
             if cookie is not None:
                 self.__isLoggedIn = True
                 connHandler.set_cookie(cookie)
-        print("OK")
+        print("OK: user logged in.")
 
     def logout(self, verbose=False):
         """Performs a logout
@@ -1805,6 +1508,453 @@ class TapPlus(Tap):
             print(response.status, response.reason)
             print(response.getheaders())
         return response
+
+    def upload_table(self, upload_resource=None, table_name=None, 
+                     table_description=None,
+                     format=None, verbose=False):
+        """Uploads a table to the  user private space
+
+        Parameters
+        ----------
+        upload_resource : str, mandatory
+            table to be uploaded. File or URL.
+        table_name: str, required if uploadResource is provided, default None
+            resource temporary table name associated to the uploaded resource
+        table_description: str, optional, default None
+            table description
+        format : str, optional, default 'VOTable'
+            results format
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+
+        if upload_resource is None:
+            raise ValueError("Missing mandatory argument 'upload_resource'")
+        if table_name is None:
+            raise ValueError("Missing mandatory argument 'table_name'")
+        if table_description is None:
+            table_description = ""
+
+        if format is None:
+            if (str(upload_resource).startswith("http") and 
+                (str(upload_resource).endswith(".vot") or 
+                 str(upload_resource).endswith(".votable"))):
+                format = "VOTable"
+
+        self.__uploadTableMultipart(resource=upload_resource, table_name=table_name, 
+                                    table_description=table_description, format=format, 
+                                    verbose=verbose)
+        msg = "Uploaded table '"+str(table_name)+"'."
+        print(msg)
+        return msg
+
+
+    def __uploadTableMultipart(self, resource, table_name=None, table_description=None,
+                               format="VOTable", verbose=False):
+        connHandler = self.__getconnhandler()
+        if not (str(resource).startswith("http")):  # upload from file
+            args = {
+                "TASKID": str(1),
+                "TABLE_NAME": str(table_name),
+                "TABLE_DESC": str(table_description),
+                "FORMAT": str(format)}
+            f = open(resource, "r")
+            chunk = f.read()
+            f.close()
+            files = [['FILE', os.path.basename(resource), chunk]]
+            contentType, body = connHandler.encode_multipart(args, files)
+        else:    # upload from URL
+            args = {
+                "TASKID": str(1),
+                "TABLE_NAME": str(table_name),
+                "TABLE_DESC": str(table_description),
+                "FORMAT": str(format),
+                "URL": str(resource)}
+            files = [['FILE', "", ""]]
+            contentType, body = connHandler.encode_multipart(args, files)
+            
+        response = connHandler.execute_upload(body, contentType)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+        if response.status != 303:
+            isError = connHandler.check_launch_response_status(response, verbose, 200)
+            if isError:
+                errMsg = taputils.get_http_response_error(response)
+                print(response.status, errMsg)
+                raise requests.exceptions.HTTPError(errMsg)
+                return None
+        return response
+
+    def upload_table_from_job(self, job=None, table_name=None,
+                     verbose=False):
+        """Creates a table to the user private space from a job
+
+        Parameters
+        ----------
+        job: job, mandatory
+            job used to create a table. Could be a string with the jobid or 
+            a job itself
+        table_name: str, default 't'+jobid
+            resource temporary table name associated to the uploaded resource
+        table_description: str, optional, default None
+            table description
+        verbose: bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+
+        if job is None:
+            raise ValueError("Missing mandatory argument 'job'")
+        
+        if isinstance(job, Job):
+            j = job
+        else:
+            j = self.load_async_job(job)
+            if j is None:
+                raise ValueError("Job " + str(job) + " not found")
+                return
+        if table_name == None:
+            table_name = "t" + str(j.get_jobid())
+        if verbose:
+            print("JOB = " + j.get_jobid())
+        self.__uploadTableMultipartFromJob(resource=j.get_jobid(), 
+                                           table_name=table_name, 
+                                           table_description=j.get_query(), 
+                                           verbose=verbose)
+        msg = "Created table '"+str(table_name)+"' from job: '"+str(j.get_jobid())+"'."
+        print(msg)
+        return msg
+
+    
+    def __uploadTableMultipartFromJob(self, resource, table_name=None, table_description=None,
+                                      verbose=False):
+        args = {
+            "TASKID": str(1),
+            "JOBID": str(resource),
+            "TABLE_NAME": str(table_name),
+            "TABLE_DESC": str(table_description),
+            "FORMAT": str(format)}
+        files = [['FILE', "", ""]]
+        connHandler = self.__getconnhandler()
+        contentType, body = connHandler.encode_multipart(args, files)
+            
+        response = connHandler.execute_upload(body, contentType)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        return response
+
+    def delete_user_table(self, table_name=None, force_removal=False, verbose=False):
+        """Removes a user table
+
+        Parameters
+        ----------
+        table_name: str, required
+            table to be removed
+        force_removal : bool, optional, default 'False'
+            flag to indicate if removal should be forced
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+        if table_name is None:
+            raise ValueError("Table name cannot be null")
+        if force_removal == True:
+            args = {
+                    "TABLE_NAME": str(table_name),
+                    "DELETE": "TRUE",
+                    "FORCE_REMOVAL": "TRUE"}
+        else:
+            args = {
+                    "TABLE_NAME": str(table_name),
+                    "DELETE": "TRUE",
+                    "FORCE_REMOVAL": "FALSE"}
+        connHandler = self.__getconnhandler()
+        data = connHandler.url_encode(args)
+        response = connHandler.execute_upload(data,verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Table '"+str(table_name)+"' deleted."
+        print(msg)
+        return msg
+    
+    def update_user_table(self, table_name=None, list_of_changes=[], 
+                          verbose=False):
+        """Updates a user table
+
+        Parameters
+        ----------
+        table_name: str, required
+            table to be updated
+        list_of_changes: list, required
+            list of lists, each one of them containing sets of 
+            [column_name, field_name, value]. 
+            column_name is the name of the column to be updated
+            field_name is the name of the tap field to be modified
+            field name can be 'utype', 'ucd', 'flags' or 'indexed'
+            value is the new value this field of this column will take
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+        if table_name is None:
+            raise ValueError("Table name cannot be null")
+        if list_of_changes is None:
+            raise ValueError("List of changes cannot be null")
+        if len(list_of_changes) == 0:
+            raise ValueError("List of changes cannot be empty")
+        for change in list_of_changes:
+            if change is None:
+                raise ValueError("None of the changes can be null")
+            if len(change) != 3: #  [column_name, field_name, value]
+                raise ValueError("All of the changes must have three "\
+                                 "elements: [column_name, field_name, value]")
+            index = 0
+            for value in change:
+                if value is None:
+                    raise ValueError("None of the values for the changes"\
+                                     " can be null")
+                if (index == 1 and value != 'utype' and value != 'ucd' 
+                    and value != 'flags' and value != 'indexed'):
+                    raise ValueError("Position 2 of all changes must be "\
+                                     "'utype', 'ucd', 'flags' or 'indexed'")
+                index = index + 1
+
+        table = self.load_table(table=table_name, verbose=verbose)
+        if table is None:
+            raise ValueError("Table name not found")
+        columns = table.get_columns()
+        if len(columns) == 0:
+            raise ValueError("Table has no columns")
+
+        for change in list_of_changes:
+            index = 0
+            for value in change:
+                if (index == 0):
+                    found = False
+                    for c in columns:
+                        if c.get_name() == value:
+                            found = True
+                            break
+                    if found == False:
+                        raise ValueError("Column name introduced "
+                                          + str(value)
+                                          + " was not found in the table")
+                index = index + 1
+        
+        currentColumnRa = self.__columnsContainFlag(columns, "Ra")
+        currentColumnDec = self.__columnsContainFlag(columns, "Dec")
+            
+        newColumnRa = self.__changesContainFlag(list_of_changes, "Ra")
+        newColumnDec = self.__changesContainFlag(list_of_changes, "Dec")
+                    
+        if currentColumnRa is None and currentColumnDec is None:#  None of them are in place
+            if ((newColumnRa is not None and newColumnDec is None) or
+                (newColumnRa is None and newColumnDec is not None)):
+                raise ValueError("Both Ra and Dec must be specified when updating "\
+                                 "one of them.")
+            
+        if ((currentColumnRa is None and currentColumnDec is not None) or
+            (currentColumnRa is not None and currentColumnDec is None)):#  Only one of them is present
+            raise ValueError("One of (Ra, Dec) is not present but the other is. "\
+                             "Wrong initial configuration of the table.")
+            
+        if currentColumnRa is not None and currentColumnDec is not None:#  Both are initially present
+            if newColumnRa is not None or newColumnDec is not None:
+                raise ValueError("Both Ra and Dec are already present in this table. "\
+                                 "Only one of each is allowed.")
+
+        
+        num_cols = len(columns)
+        
+        args = {
+                "ACTION": "edit",
+                "NUMTABLES": str(1),
+                "TABLE0_NUMCOLS": str(num_cols),
+                "TABLE0": str(table_name),
+                }        
+        
+        index = 0
+        for column in columns:
+            found_in_changes = False
+            for change in list_of_changes:
+                if (str(change[0]) == str(column.get_name())):
+                    found_in_changes = True
+                    break
+            column_name = column.get_name()
+            flags = column.get_flags()
+            if str(flags) == '1':
+                flags = 'Ra'
+            elif str(flags) == '2':
+                flags = 'Dec'
+            elif str(flags) == '4':
+                flags = 'Flux'
+            elif str(flags) == '8':
+                flags = 'Mag'
+            elif str(flags) == '16':
+                flags = 'PK'
+            elif str(flags) == '33':
+                flags = 'Ra'
+            elif str(flags) == '34':
+                flags = 'Dec'
+            elif str(flags) == '38':
+                flags = 'Flux'
+            elif str(flags) == '40':
+                flags = 'Mag'
+            elif str(flags) == '48':
+                flags = 'PK'
+            else:
+                flags = None
+            indexed = (str(column.get_flag()) == 'indexed'
+                       or str(flags) == 'Ra'
+                       or str(flags) == 'Dec'
+                       or str(flags) == 'PK')
+            ucd = str(column.get_ucd())
+            utype = str(column.get_utype())
+            if found_in_changes:
+                for change in list_of_changes:
+                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'flags':
+                        flags = str(change[2])
+                        break
+                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'indexed':
+                        indexed = str(change[2])
+                        break
+                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'ucd':
+                        ucd = str(change[2])
+                        break
+                    if str(change[0]) == str(column.get_name()) and str(change[1]) == 'utype':
+                        utype = str(change[2])
+                        break
+            if flags == 'Ra' or flags == 'Dec' or flags == 'PK':
+                indexed = str(True)
+            args["TABLE0_COL" + str(index)] = str(column_name)                
+            args["TABLE0_COL" + str(index) + "_FLAGS"] = str(flags)
+            args["TABLE0_COL" + str(index) + "_INDEXED"] = str(indexed)
+            args["TABLE0_COL" + str(index) + "_UCD"] = str(ucd)
+            args["TABLE0_COL" + str(index) + "_UTYPE"] = str(utype)
+            index = index + 1
+        connHandler = self.__getconnhandler()
+        data = connHandler.url_encode(args)
+        response = connHandler.execute_table_edit(data,verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Table '"+str(table_name)+"' updated."
+        print(msg)
+        return msg
+
+    def set_ra_dec_columns(self, table_name=None,
+                           ra_column_name=None, dec_column_name=None,
+                           verbose=False):
+        """Set columns of a table as ra and dec respectively a user table
+
+        Parameters
+        ----------
+        table_name: str, required
+            table to be set
+        ra_column_name: str, required
+            ra column to be set
+        dec_column_name: str, required
+            dec column to be set
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+
+        Returns
+        -------
+        A message (OK/Error) or a job when the table is big
+        """
+
+        if table_name is None:
+            raise ValueError("Table name cannot be null")
+        if ra_column_name is None:
+            raise ValueError("Ra column name cannot be null")
+        if dec_column_name is None:
+            raise ValueError("Dec column name cannot be null")
+
+        args = {
+                "ACTION": "radec",
+                "TABLE_NAME": str(table_name),
+                "RA": str(ra_column_name),
+                "DEC": str(dec_column_name),
+                }
+        connHandler = self.__getconnhandler()
+        data = connHandler.url_encode(args)
+        response = connHandler.execute_table_edit(data,verbose=verbose)
+        isError = connHandler.check_launch_response_status(response, verbose, 200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        msg = "Table '"+str(table_name)+"' updated (ra/dec)."
+        print(msg)
+        return msg
+
+    def __columnsContainFlag(self, columns=None, flag=None, verbose=False):
+        c = None;
+        if (columns is not None and len(columns) > 0):
+            for column in columns:
+                f = column.get_flags()
+                if str(f) == '1' or str(f) == '33':
+                    f = 'Ra'
+                elif str(f) == '2' or str(f) == '34':
+                    f = 'Dec'
+                elif str(f) == '4' or str(f) == '38':
+                    f = 'Flux'
+                elif str(f) == '8' or str(f) == '40':
+                    f = 'Mag'
+                elif str(f) == '16' or str(f) == '48':
+                    f = 'PK'
+                else:
+                    f = None
+                if str(flag) == str(f):
+                    c = column.get_name()
+                    break
+        return c
+    
+    def __changesContainFlag(self, changes=None, flag=None, verbose=False):
+        c = None;
+        if (changes is not None and len(changes) > 0):
+            for change in changes:
+                if str(change[1]) == "flags":
+                    value = str(change[2])
+                    if str(flag) == str(value):
+                        c = str(change[0])
+                        break
+        return c
 
     def __getconnhandler(self):
         return self._Tap__connHandler

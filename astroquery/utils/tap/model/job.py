@@ -19,6 +19,7 @@ import time
 
 from astroquery.utils.tap.model import modelutils
 from astroquery.utils.tap.xmlparser import utils
+from astroquery.utils.tap import taputils
 import sys
 
 __all__ = ['Job']
@@ -180,10 +181,14 @@ class Job(object):
             if phase == 'RUN':
                 phase = 'QUEUED'
                 if response.status != 200 and response.status != 303:
-                    raise Exception(response.reason)
+                    errMsg = taputils.get_http_response_error(response)
+                    print(response.status, errMsg)
+                    raise Exception(errMsg)
             else:
                 if response.status != 200:
-                    raise Exception(response.reason)
+                    errMsg = taputils.get_http_response_error(response)
+                    print(response.status, errMsg)
+                    raise Exception(errMsg)
             self.__phase = phase
             return response
         else:
@@ -211,7 +216,9 @@ class Job(object):
                 print(response.getheaders())
             self.__last_phase_response_status = response.status
             if response.status != 200:
-                raise Exception(response.reason)
+                errMsg = taputils.get_http_response_error(response)
+                print(response.status, errMsg)
+                raise Exception(errMsg)
             return response
         else:
             raise ValueError("Cannot start a job in phase: " + str(self.__phase))
@@ -235,7 +242,9 @@ class Job(object):
 
             self.__last_phase_response_status = response.status
             if response.status != 200:
-                raise Exception(response.reason)
+                errMsg = taputils.get_http_response_error(response)
+                print(response.status, errMsg)
+                raise Exception(errMsg)
 
             self.__phase = str(response.read().decode('utf-8'))
 
@@ -641,8 +650,9 @@ class Job(object):
                                                                           verbose,
                                                                           200)
                 if isError:
-                    print(response.reason)
-                    raise Exception(response.reason)
+                    errMsg = taputils.get_http_response_error(response)
+                    print(response.status, errMsg)
+                    raise requests.exceptions.HTTPError(errMsg)
                 self.__connHandler.dump_to_file(output, response)
 
     def wait_for_job_end(self, verbose=False):
@@ -692,8 +702,9 @@ class Job(object):
                                                                   200)
         self.__phase = phase
         if isError:
-            print(resultsResponse.reason)
-            raise Exception(resultsResponse.reason)
+            errMsg = taputils.get_http_response_error(resultsResponse)
+            print(resultsResponse.status, errMsg)
+            raise Exception(errMsg)
         else:
             outputFormat = self.get_output_format()
             results = utils.read_http_response(resultsResponse, outputFormat)
