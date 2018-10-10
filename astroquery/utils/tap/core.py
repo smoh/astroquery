@@ -946,10 +946,6 @@ class TapPlus(Tap):
             description of the sharing
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if group_name is None or table_name is None:
             raise ValueError("Both 'group_name' and 'table_name' must be specified")
@@ -979,8 +975,6 @@ class TapPlus(Tap):
             return None
         msg = "Shared table '"+str(table_name)+"' to group '"+str(group_name)+"'."
         print(msg)
-        return msg
-
             
     def share_table_stop(self,
                     table_name=None,
@@ -996,10 +990,6 @@ class TapPlus(Tap):
             group where the table is shared to
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if table_name is None:
             raise ValueError("'table_name' must be specified")
@@ -1029,7 +1019,6 @@ class TapPlus(Tap):
             return None
         msg = "Stop sharing table '"+str(table_name)+"' to group '"+str(group_name)+"'."
         print(msg)
-        return msg
             
     def share_group_create(self,
                     group_name=None,
@@ -1045,10 +1034,6 @@ class TapPlus(Tap):
             description of the group
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if group_name is None:
             raise ValueError("'group_name' must be specified")
@@ -1076,7 +1061,6 @@ class TapPlus(Tap):
             return None
         msg = "Created group '"+str(group_name)+"'."
         print(msg)
-        return msg
 
     def share_group_delete(self,
                     group_name=None,
@@ -1089,10 +1073,6 @@ class TapPlus(Tap):
             group to be created
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if group_name is None:
             raise ValueError("'group_name' must be specified")
@@ -1117,7 +1097,6 @@ class TapPlus(Tap):
             return None
         msg = "Deleted group '"+str(group_name)+"'."
         print(msg)
-        return msg
 
     def share_group_add_user(self,
                              group_name=None,
@@ -1133,10 +1112,6 @@ class TapPlus(Tap):
             user id to be added
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if group_name is None or user_id is None:
             raise ValueError("Both 'group_name' and 'user_id' must be specified")
@@ -1180,7 +1155,6 @@ class TapPlus(Tap):
             return None
         msg = "Added user '"+str(user_id)+"' from group '"+str(group_name)+"'."
         print(msg)
-        return msg
 
     def share_group_delete_user(self,
                                 group_name=None,
@@ -1196,10 +1170,6 @@ class TapPlus(Tap):
             user id to be deleted
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if group_name is None or user_id is None:
             raise ValueError("Both 'group_name' and 'user_id' must be specified")
@@ -1242,7 +1212,6 @@ class TapPlus(Tap):
             return None
         msg = "Deleted user '"+str(user_id)+"' from group '"+str(group_name)+"'."
         print(msg)
-        return msg
 
     def is_valid_user(self, user_id=None, verbose=False):
         """Determines if the specified user is valid
@@ -1397,7 +1366,6 @@ class TapPlus(Tap):
             raise requests.exceptions.HTTPError(errMsg)
         msg = "Removed jobs: '"+str(jobs_list)+"'."
         print(msg)
-        return msg
 
     def login(self, user=None, password=None, credentials_file=None,
               verbose=False):
@@ -1526,10 +1494,6 @@ class TapPlus(Tap):
             results format
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
 
         if upload_resource is None:
@@ -1545,13 +1509,20 @@ class TapPlus(Tap):
                  str(upload_resource).endswith(".votable"))):
                 format = "VOTable"
 
-        self.__uploadTableMultipart(resource=upload_resource, table_name=table_name, 
-                                    table_description=table_description, format=format, 
-                                    verbose=verbose)
-        msg = "Uploaded table '"+str(table_name)+"'."
+        response = self.__uploadTableMultipart(resource=upload_resource,
+                                               table_name=table_name, 
+                                               table_description=table_description, 
+                                               format=format, 
+                                               verbose=verbose)
+        if response.status == 303:
+            location = self.__connHandler.find_header(
+                response.getheaders(),
+                "location")
+            jobid = self.__getJobId(location)
+            msg = "Job '"+jobid+"' created to upload table '"+str(table_name)+"'."
+        else:
+            msg = "Uploaded table '"+str(table_name)+"'."
         print(msg)
-        return msg
-
 
     def __uploadTableMultipart(self, resource, table_name=None, table_description=None,
                                format="VOTable", verbose=False):
@@ -1605,10 +1576,6 @@ class TapPlus(Tap):
             table description
         verbose: bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
 
         if job is None:
@@ -1631,9 +1598,7 @@ class TapPlus(Tap):
                                            verbose=verbose)
         msg = "Created table '"+str(table_name)+"' from job: '"+str(j.get_jobid())+"'."
         print(msg)
-        return msg
 
-    
     def __uploadTableMultipartFromJob(self, resource, table_name=None, table_description=None,
                                       verbose=False):
         args = {
@@ -1669,10 +1634,6 @@ class TapPlus(Tap):
             flag to indicate if removal should be forced
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if table_name is None:
             raise ValueError("Table name cannot be null")
@@ -1700,7 +1661,6 @@ class TapPlus(Tap):
             return None
         msg = "Table '"+str(table_name)+"' deleted."
         print(msg)
-        return msg
     
     def update_user_table(self, table_name=None, list_of_changes=[], 
                           verbose=False):
@@ -1719,10 +1679,6 @@ class TapPlus(Tap):
             value is the new value this field of this column will take
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
         if table_name is None:
             raise ValueError("Table name cannot be null")
@@ -1874,7 +1830,6 @@ class TapPlus(Tap):
             return None
         msg = "Table '"+str(table_name)+"' updated."
         print(msg)
-        return msg
 
     def set_ra_dec_columns(self, table_name=None,
                            ra_column_name=None, dec_column_name=None,
@@ -1891,10 +1846,6 @@ class TapPlus(Tap):
             dec column to be set
         verbose : bool, optional, default 'False'
             flag to display information about the process
-
-        Returns
-        -------
-        A message (OK/Error) or a job when the table is big
         """
 
         if table_name is None:
@@ -1921,7 +1872,6 @@ class TapPlus(Tap):
             return None
         msg = "Table '"+str(table_name)+"' updated (ra/dec)."
         print(msg)
-        return msg
 
     def __columnsContainFlag(self, columns=None, flag=None, verbose=False):
         c = None;
