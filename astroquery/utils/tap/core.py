@@ -1405,7 +1405,7 @@ class TapPlus(Tap):
                 print("Invalid user name")
                 return
         if password is None:
-            password = getpass.getpass()
+            password = getpass.getpass("Password: ")
             if password is None:
                 print("Invalid password")
                 return
