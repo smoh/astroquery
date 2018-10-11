@@ -942,7 +942,11 @@ class TapPlus(Tap):
         group = self.load_group(group_name, verbose)
         
         if group is None:
-            raise ValueError("It wasn't impossible to load group " + group_name)     
+            raise ValueError("Group '" + group_name + "' not found.")
+        
+        table = self.load_table(table=table_name, verbose=verbose)
+        if table is None:
+            raise ValueError("Table '"+table_name+"' not found.")
             
         data = ("action=CreateOrUpdateItem&resource_type=0&title=" + 
                    str(table_name) +
@@ -1066,7 +1070,7 @@ class TapPlus(Tap):
         group = self.load_group(group_name, verbose)
         
         if group is None:
-            raise ValueError("Group " + group_name + " doesn't exist")     
+            raise ValueError("Group '" + group_name + "' doesn't exist")     
             
         data = ("action=RemoveGroup&resource_type=0&group_id=" + 
                    str(group.get_id()))
@@ -1104,7 +1108,7 @@ class TapPlus(Tap):
         
         group = self.load_group(group_name, verbose)
         if group is None:
-            raise ValueError("Group " + group_name + " doesn't exist")
+            raise ValueError("Group " + group_name + "' doesn't exist")
         user_found_in_group = False     
         for u in group.get_users():
             if str(u.get_id()) == user_id:
@@ -1112,10 +1116,10 @@ class TapPlus(Tap):
                 break
         
         if user_found_in_group == True:
-            raise ValueError("User id " + str(user_id) + " found in group " + str(group_name))
+            raise ValueError("User id '" + str(user_id) + "' found in group '" + str(group_name)) + "'"
         
         if self.is_valid_user(user_id, verbose) == False:
-            print("Warning: user id '" + str(user_id)+ "' not found.")
+            raise ValueError("User id '" + str(user_id)+ "' not found.")
 
         users = ""
         for u in group.get_users():
@@ -1161,7 +1165,7 @@ class TapPlus(Tap):
         
         group = self.load_group(group_name, verbose)
         if group is None:
-            raise ValueError("Group " + group_name + " doesn't exist")
+            raise ValueError("Group '" + group_name + "' doesn't exist")
         user_found_in_group = False     
         for u in group.get_users():
             if str(u.get_id()) == user_id:
@@ -1169,7 +1173,7 @@ class TapPlus(Tap):
                 break
         
         if user_found_in_group == False:
-            raise ValueError("User id " + str(user_id) + " not found in group " + str(group_name))
+            raise ValueError("User id '" + str(user_id) + "' not found in group '" + str(group_name)) + "'"
         
         users = ""
         for u in group.get_users():
