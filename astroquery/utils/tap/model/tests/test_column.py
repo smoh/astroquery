@@ -28,6 +28,7 @@ def data_path(filename):
 class TestTableColumn(unittest.TestCase):
 
     def test_column(self):
+        flags="flags"
         name = "name"
         arraysize = "arraysize"
         datatype = "datatype"
@@ -36,7 +37,7 @@ class TestTableColumn(unittest.TestCase):
         utype = "utype"
         unit = "unit"
         description = "description"
-        c = TapColumn()
+        c = TapColumn(flags)
         c.set_name(name)
         c.set_array_size(arraysize)
         c.set_data_type(datatype)
@@ -69,6 +70,9 @@ class TestTableColumn(unittest.TestCase):
         assert c.get_description() == description, \
             "Invalid description, expected: %s, found: %s" % (description,
                                                               c.get_description())
+        assert c.get_flags() == flags, \
+            "Invalid description, expected: %s, found: %s" % (flags,
+                                                              c.get_flags())
 
 
 if __name__ == "__main__":

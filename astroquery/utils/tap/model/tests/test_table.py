@@ -40,8 +40,8 @@ class TestTable(unittest.TestCase):
 
     def test_table_columns(self):
         table = TapTableMeta()
-        c1 = TapColumn()
-        c2 = TapColumn()
+        c1 = TapColumn("flags")
+        c2 = TapColumn("flags")
         table.add_column(c1)
         table.add_column(c2)
         res = table.get_columns()

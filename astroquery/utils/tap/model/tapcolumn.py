@@ -20,14 +20,13 @@ class TapColumn(object):
     """TAP column object
     """
 
-    def __init__(self, attrs):
+    def __init__(self, flags):
         """
         Constructor
         """
-        self.__attributes = attrs
-        self.__internal_init()
+        self.__internal_init(flags)
 
-    def __internal_init(self):
+    def __internal_init(self, flags):
         self.__name = None
         self.__description = None
         self.__unit = None
@@ -36,7 +35,7 @@ class TapColumn(object):
         self.__datatype = None
         self.__arraysize = None
         self.__flag = None
-        self.__flags = self.__attributes.getValue('esatapplus:flags')
+        self.__flags = flags
 
     def get_name(self):
         """Returns the TAP column name
