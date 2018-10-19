@@ -188,7 +188,7 @@ class TapColumn(object):
             TAP column flag
         """
         self.__flag = flag
-        
+
     def get_flags(self):
         """Returns the TAP column flag (TAP+)
 
