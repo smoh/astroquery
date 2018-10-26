@@ -129,8 +129,6 @@ class Tap(object):
                                          table_edit_context=table_edit_context,
                                          data_context=data_context,
                                          datalink_context=datalink_context,
-                                         share_context=share_context,
-                                         users_context=users_context,
                                          port=port,
                                          sslport=sslport)
         # if connectionHandler is set, use it (useful for testing)
@@ -305,8 +303,8 @@ class Tap(object):
                                                           response.getheaders(),
                                                           isError,
                                                           output_format)
-        job.set_output_file(suitableOutputFile)
-        job.set_output_format(output_format)
+        job.outputFile = suitableOutputFile
+        job.parameters['format'] = output_format
         job.set_response_status(response.status, response.reason)
         job.set_phase('PENDING')
         if isError:
@@ -327,7 +325,7 @@ class Tap(object):
                 job.set_results(results)
             if verbose:
                 print("Query finished.")
-            job.set_phase('COMPLETED')
+            job._phase = 'COMPLETED'
         return job
 
     def launch_job_async(self, query, name=None, output_file=None,
@@ -395,9 +393,9 @@ class Tap(object):
                                                           response.getheaders(),
                                                           isError,
                                                           output_format)
-        job.set_output_file(suitableOutputFile)
+        job.outputFile = suitableOutputFile
         job.set_response_status(response.status, response.reason)
-        job.set_output_format(output_format)
+        job.parameters['format'] = output_format
         job.set_phase('PENDING')
         if isError:
             job.set_failed(True)
@@ -414,8 +412,8 @@ class Tap(object):
             jobid = taputils.get_jobid_from_location(location)
             if verbose:
                 print("job " + str(jobid) + ", at: " + str(location))
-            job.set_jobid(jobid)
-            job.set_remote_location(location)
+            job.jobid = jobid
+            job.remoteLocation = location
             if autorun is True:
                 job.set_phase('EXECUTING')
                 if not background:
@@ -510,7 +508,7 @@ class Tap(object):
         jobs = jsp.parseData(response)
         if jobs is not None:
             for j in jobs:
-                j.set_connhandler(self.__connHandler)
+                j.connHandler = self.__connHandler
         return jobs
 
     def __appendData(self, args):

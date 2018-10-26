@@ -71,6 +71,8 @@ Criteria are supplied as keyword arguments, where valid criteria are "coordinate
 "objectname", "radius" (as in `~astroquery.mast.ObservationsClass.query_region` and
 `~astroquery.mast.ObservationsClass.query_object`), and all observation fields listed
 `here <https://mast.stsci.edu/api/v0/_c_a_o_mfields.html>`__.
+Additionally calibration data can be accessed by setting the obstype keyword to 'cal'
+(calibration only) or 'all' (calibration and science). 
 
 Argument values are one or more acceptable values for the criterion,
 except for fields with a float datatype where the argument should be in the form
@@ -242,7 +244,6 @@ with a `~astropy.table.Table` of data products, or a list (or single) obsid as t
 
                 >>> from astroquery.mast import Observations
                 >>> Observations.download_products('2003839997',
-                                                   mrp_only=False,
                                                    productType="SCIENCE",
                                                    curl_flag=True)
                                                    
@@ -256,8 +257,6 @@ Filter keyword arguments can be applied to download only data products that meet
 Available filters are "mrp_only" (Minimum Recommended Products), "extension" (file extension),
 and all products fields listed `here <https://mast.stsci.edu/api/v0/_productsfields.html>`_.
 
-**Important: mrp_only defaults to True.**
-
 The ‘AND' operation is performed for a list of filters, and the ‘OR' operation is performed within a filter set.
 The below example illustrates downloading all product files with the extension "fits" that are either "RAW" or "UNCAL."
 
@@ -265,7 +264,6 @@ The below example illustrates downloading all product files with the extension "
 
                 >>> from astroquery.mast import Observations
                 >>> Observations.download_products('2003839997',
-                                                   mrp_only=False,
                                                    productSubGroupDescription=["RAW", "UNCAL"],
                                                    extension="fits")
                 Downloading URL https://mast.stsci.edu/api/v0/download/file/HST/product/ib3p11p7q_raw.fits to ./mastDownload/HST/IB3P11P7Q/ib3p11p7q_raw.fits ... [Done]
@@ -284,7 +282,6 @@ Product filtering can also be applied directly to a table of products without pr
                 31
                 
                 >>> dataProductsByID = Observations.filter_products(dataProductsByID,
-                                                                    mrp_only=False,
                                                                     productSubGroupDescription=["RAW", "UNCAL"],
                                                                     extenstion="fits")
                 >>> print(len(dataProductsByID))
@@ -382,7 +379,8 @@ An optional version parameter allows you to select which version you want, the d
 
 .. code-block:: python
 
-                >>> catalogData = Catalogs.query_region("158.47924 -7.30962", radius=0.1, catalog="Gaia", version=2)
+                >>> catalogData = Catalogs.query_region("158.47924 -7.30962", radius=0.1,
+                >>>                                      catalog="Gaia", version=2)
                 >>> print("Number of results:",len(catalogData))
                 >>> print(catalogData[:4])
 

@@ -5,7 +5,6 @@ import sys
 import os.path
 import shutil
 import webbrowser
-import getpass
 import warnings
 import keyring
 import numpy as np
@@ -217,23 +216,9 @@ class EsoClass(QueryWithLogin):
                 username = self.USERNAME
 
         # Get password from keyring or prompt
-        password_from_keyring = None
-        if reenter_password is False:
-            try:
-                password_from_keyring = keyring.get_password(
-                    "astroquery:www.eso.org", username)
-            except keyring.errors.KeyringError as exc:
-                log.warning("Failed to get a valid keyring for password "
-                            "storage: {}".format(exc))
+        password, password_from_keyring = self._get_password(
+            "astroquery:www.eso.org", username, reenter=reenter_password)
 
-        if password_from_keyring is None:
-            if system_tools.in_ipynb():
-                log.warning("You may be using an ipython notebook:"
-                            " the password form will appear in your terminal.")
-            password = getpass.getpass("{0}, enter your ESO password:\n"
-                                       .format(username))
-        else:
-            password = password_from_keyring
         # Authenticate
         log.info("Authenticating {0} on www.eso.org...".format(username))
 
@@ -615,7 +600,7 @@ class EsoClass(QueryWithLogin):
         return datasets_to_download, files
 
     def retrieve_data(self, datasets, continuation=False, destination=None,
-                      with_calib='none'):
+                      with_calib='none', request_all_objects=False):
         """
         Retrieve a list of datasets form the ESO archive.
 
@@ -634,6 +619,12 @@ class EsoClass(QueryWithLogin):
         with_calib : string
             Retrieve associated calibration files: 'none' (default), 'raw' for
             raw calibrations, or 'processed' for processed calibrations.
+        request_all_objects : bool
+            When retrieving associated calibrations (``with_calib != 'none'``),
+            this allows to request all the objects included the already
+            downloaded ones, to be sure to retrieve all calibration files.
+            This is useful when the download was interrupted. `False` by
+            default.
 
         Returns
         -------
@@ -663,9 +654,12 @@ class EsoClass(QueryWithLogin):
             raise TypeError("Datasets must be given as a list of strings.")
 
         # First: Detect datasets already downloaded
-        log.info("Detecting already downloaded datasets...")
-        datasets_to_download, files = self._check_existing_files(
-            datasets, continuation=continuation, destination=destination)
+        if with_calib != 'none' and request_all_objects:
+            datasets_to_download, files = list(datasets), []
+        else:
+            log.info("Detecting already downloaded datasets...")
+            datasets_to_download, files = self._check_existing_files(
+                datasets, continuation=continuation, destination=destination)
 
         # Second: Check that the datasets to download are in the archive
         log.info("Checking availability of datasets to download...")
