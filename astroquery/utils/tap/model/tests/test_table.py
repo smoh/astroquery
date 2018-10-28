@@ -32,8 +32,8 @@ class TestTable(unittest.TestCase):
         schemaName = "sch"
         tableName = "tbl"
         expected = schemaName + "." + tableName
-        table.set_schema(schemaName)
-        table.set_name(tableName)
+        table.schema = schemaName
+        table.name = tableName
         res = table.get_qualified_name()
         assert res == expected, \
             "Qualified name, expected: %s, found: %s" % (expected, res)
@@ -44,7 +44,7 @@ class TestTable(unittest.TestCase):
         c2 = TapColumn("flags")
         table.add_column(c1)
         table.add_column(c2)
-        res = table.get_columns()
+        res = table.columns
         assert len(res) == 2, \
             "Num columns, expected: %d, found: %d" % (2, len(res))
 

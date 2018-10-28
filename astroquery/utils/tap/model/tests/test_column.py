@@ -38,41 +38,41 @@ class TestTableColumn(unittest.TestCase):
         unit = "unit"
         description = "description"
         c = TapColumn(flags)
-        c.set_name(name)
-        c.set_array_size(arraysize)
-        c.set_data_type(datatype)
-        c.set_flag(flag)
-        c.set_ucd(ucd)
-        c.set_unit(unit)
-        c.set_utype(utype)
-        c.set_description(description)
-        assert c.get_name() == name, \
+        c.name = name
+        c.arraysize = arraysize
+        c.datatype = datatype
+        c.flag = flag
+        c.ucd = ucd
+        c.unit = unit
+        c.utype = utype
+        c.description = description
+        assert c.name == name, \
             "Invalid name, expected: %s, found: %s" % (name,
-                                                       c.get_name())
-        assert c.get_array_size() == arraysize, \
+                                                       c.name)
+        assert c.arraysize == arraysize, \
             "Invalid arraysize, expected: %s, found: %s" % (arraysize,
-                                                            c.get_array_size())
-        assert c.get_data_type() == datatype, \
+                                                            c.arraysize)
+        assert c.datatype == datatype, \
             "Invalid datatype, expected: %s, found: %s" % (datatype,
-                                                           c.get_data_type())
-        assert c.get_flag() == flag, \
+                                                           c.datatype)
+        assert c.flag == flag, \
             "Invalid flag, expected: %s, found: %s" % (flag,
-                                                       c.get_flag())
-        assert c.get_ucd() == ucd, \
+                                                       c.flag)
+        assert c.ucd == ucd, \
             "Invalid ucd, expected: %s, found: %s" % (ucd,
-                                                      c.get_ucd())
-        assert c.get_utype() == utype, \
+                                                      c.ucd)
+        assert c.utype == utype, \
             "Invalid utype, expected: %s, found: %s" % (utype,
-                                                        c.get_utype())
-        assert c.get_unit() == unit, \
+                                                        c.utype)
+        assert c.unit == unit, \
             "Invalid unit, expected: %s, found: %s" % (unit,
-                                                       c.get_unit())
-        assert c.get_description() == description, \
+                                                       c.unit)
+        assert c.description == description, \
             "Invalid description, expected: %s, found: %s" % (description,
-                                                              c.get_description())
-        assert c.get_flags() == flags, \
+                                                              c.description)
+        assert c.flags == flags, \
             "Invalid description, expected: %s, found: %s" % (flags,
-                                                              c.get_flags())
+                                                              c.flags)
 
 
 if __name__ == "__main__":
