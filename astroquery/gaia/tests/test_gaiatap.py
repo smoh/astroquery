@@ -39,7 +39,8 @@ class TestTap(unittest.TestCase):
 
     def test_load_tables(self):
         dummyTapHandler = DummyTapHandler()
-        tap = GaiaClass(tap_plus_handler=dummyTapHandler,
+        tap = GaiaClass(
+                        tap_plus_handler=dummyTapHandler,
                         datalink_handler=dummyTapHandler)
         # default parameters
         parameters = {}
@@ -59,7 +60,8 @@ class TestTap(unittest.TestCase):
 
     def test_load_table(self):
         dummyTapHandler = DummyTapHandler()
-        tap = GaiaClass(tap_plus_handler=dummyTapHandler,
+        tap = GaiaClass(
+                        tap_plus_handler=dummyTapHandler,
                         datalink_handler=dummyTapHandler)
         # default parameters
         parameters = {}
@@ -77,7 +79,8 @@ class TestTap(unittest.TestCase):
 
     def test_launch_sync_job(self):
         dummyTapHandler = DummyTapHandler()
-        tap = GaiaClass(tap_plus_handler=dummyTapHandler,
+        tap = GaiaClass(
+                        tap_plus_handler=dummyTapHandler,
                         datalink_handler=dummyTapHandler)
         query = "query"
         # default parameters
@@ -121,7 +124,8 @@ class TestTap(unittest.TestCase):
 
     def test_launch_async_job(self):
         dummyTapHandler = DummyTapHandler()
-        tap = GaiaClass(tap_plus_handler=dummyTapHandler,
+        tap = GaiaClass(
+                        tap_plus_handler=dummyTapHandler,
                         datalink_handler=dummyTapHandler)
         query = "query"
         # default parameters
@@ -169,7 +173,8 @@ class TestTap(unittest.TestCase):
 
     def test_list_async_jobs(self):
         dummyTapHandler = DummyTapHandler()
-        tap = GaiaClass(tap_plus_handler=dummyTapHandler,
+        tap = GaiaClass(
+                        tap_plus_handler=dummyTapHandler,
                         datalink_handler=dummyTapHandler)
         # default parameters
         parameters = {}
@@ -611,10 +616,11 @@ class TestTap(unittest.TestCase):
         parameters['table_name'] = table_name
         parameters['table_description'] = table_description
         parameters['verbose'] = verbose
-        tap.upload_table_from_job(job=job,
-                                  table_name=table_name,
-                                  table_description=table_description,
-                                  verbose=verbose)
+        tap.upload_table_from_job(
+                                 job,
+                                 table_name,
+                                 table_description,
+                                 verbose)
         dummyHandler.check_call('upload_table_from_job', parameters)
 
     def test_delete_user_table(self):
@@ -764,9 +770,11 @@ class TestTap(unittest.TestCase):
             tap.cross_match(full_qualified_table_name_a='tableA',
                             full_qualified_table_name_b='schemaB.tableB',
                             results_table_name='results')
-        assert "Not found schema name in full qualified table A: 'tableA'" \
-            in err.value.args[0]
-        # missing table B
+        assert (
+                "Not found schema name in full qualified " +
+                "table A: 'tableA'" in err.value.args[0]
+               )
+        # missing table
         with pytest.raises(ValueError) as err:
             tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
                             full_qualified_table_name_b=None,
@@ -777,8 +785,10 @@ class TestTap(unittest.TestCase):
             tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
                             full_qualified_table_name_b='tableB',
                             results_table_name='results')
-        assert "Not found schema name in full qualified table B: 'tableB'" \
-            in err.value.args[0]
+        assert (
+                "Not found schema name in full qualified " +
+                "table B: 'tableB'" in err.value.args[0]
+                )
         # missing results table
         with pytest.raises(ValueError) as err:
             tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
@@ -790,22 +800,28 @@ class TestTap(unittest.TestCase):
             tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
                             full_qualified_table_name_b='schemaB.tableB',
                             results_table_name='schema.results')
-        assert "Please, do not specify schema for 'results_table_name'" \
-            in err.value.args[0]
+        assert (
+                "Please, do not specify schema for " +
+                "'results_table_name'" in err.value.args[0]
+                )
         # radius < 0.1
         with pytest.raises(ValueError) as err:
             tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
                             full_qualified_table_name_b='schemaB.tableB',
                             results_table_name='results', radius=0.01)
-        assert "Invalid radius value. Found 0.01, valid range: 0.1 to 10.0" \
-            in err.value.args[0]
+        assert (
+                "Invalid radius value. Found 0.01, valid " +
+                "range is: 0.1 to 10.0" in err.value.args[0]
+                )
         # radius > 10.0
         with pytest.raises(ValueError) as err:
             tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
                             full_qualified_table_name_b='schemaB.tableB',
                             results_table_name='results', radius=10.1)
-        assert "Invalid radius value. Found 10.1, valid range: 0.1 to 10.0" \
-            in err.value.args[0]
+        assert (
+                "Invalid radius value. Found 10.1, valid range " +
+                "is: 0.1 to 10.0" in err.value.args[0]
+                )
         # check default parameters
         parameters = {}
         query = "SELECT crossmatch_positional(\
@@ -823,7 +839,8 @@ class TestTap(unittest.TestCase):
         parameters['background'] = False
         parameters['upload_resource'] = None
         parameters['upload_table_name'] = None
-        tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
+        tap.cross_match(
+                        full_qualified_table_name_a='schemaA.tableA',
                         full_qualified_table_name_b='schemaB.tableB',
                         results_table_name='results')
         dummyTapHandler.check_call('launch_job_async', parameters)
@@ -850,7 +867,8 @@ class TestTap(unittest.TestCase):
         tap.cross_match(full_qualified_table_name_a='schemaA.tableA',
                         full_qualified_table_name_b='schemaB.tableB',
                         results_table_name='results',
-                        background=background, verbose=verbose)
+                        background=background,
+                        verbose=verbose)
         dummyTapHandler.check_call('launch_job_async', parameters)
 
 
