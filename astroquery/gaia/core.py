@@ -754,10 +754,10 @@ class GaiaClass(object):
             flag to display information about the process
         """
 
-        return self.__gaiatap.upload_table_from_job(job=job,
-                                                    table_name=table_name,
-                                                    table_description=table_description,
-                                                    verbose=verbose)
+        return self.__gaiatap.upload_table_from_job(job,
+                                                    table_name,
+                                                    table_description,
+                                                    verbose)
 
     def update_user_table(self, table_name=None, list_of_changes=[],
                           verbose=False):
@@ -1035,16 +1035,19 @@ class GaiaClass(object):
                              ", valid range is: 0.1 to 10.0")
         schemaA = taputils.get_schema_name(full_qualified_table_name_a)
         if schemaA is None:
-            raise ValueError("Not found schema name in full qualified table A: '"
-                             + full_qualified_table_name_a+"'")
+            raise ValueError("Not found schema name in full " +
+                             "qualified table A: '" +
+                             full_qualified_table_name_a+"'")
         tableA = taputils.get_table_name(full_qualified_table_name_a)
         schemaB = taputils.get_schema_name(full_qualified_table_name_b)
         if schemaB is None:
-            raise ValueError("Not found schema name in full qualified table B: '"
-                             + full_qualified_table_name_b+"'")
+            raise ValueError("Not found schema name in full qualified " +
+                             "table B: '" +
+                             full_qualified_table_name_b+"'")
         tableB = taputils.get_table_name(full_qualified_table_name_b)
         if taputils.get_schema_name(results_table_name) is not None:
-            raise ValueError("Please, do not specify schema for 'results_table_name'")
+            raise ValueError("Please, do not specify schema " +
+                             "for 'results_table_name'")
         query = "SELECT crossmatch_positional(\
             '"+schemaA+"','"+tableA+"',\
             '"+schemaB+"','"+tableB+"',\
