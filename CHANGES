@@ -32,6 +32,8 @@
 - utils: fix bug in ``parse_coordinates``, now strings that can be
   interpreted as coordinates are not sent through Sesame. When unit is not
   provided, degrees is now explicitely assumed. [#1252]
+- Gaia: added tables sharing, tables edition, upload from pytable and job results, cross match, data access and datalink access. [#1266]
+- utils.tap: added tables sharing, tables edition, upload from pytable and job results, data access and datalink access. [#1266]
 
 
 0.3.8 (2018-04-27)
