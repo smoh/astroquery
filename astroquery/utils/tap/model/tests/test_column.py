@@ -28,7 +28,7 @@ def data_path(filename):
 class TestTableColumn(unittest.TestCase):
 
     def test_column(self):
-        flags="flags"
+        flags = "flags"
         name = "name"
         arraysize = "arraysize"
         datatype = "datatype"
