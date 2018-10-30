@@ -284,9 +284,10 @@ class Job(object):
                 if verbose:
                     print(response.status, response.reason)
                     print(response.getheaders())
-                isError = self.connHandler.check_launch_response_status(response,
-                                                                        verbose,
-                                                                        200)
+                isError = self.connHandler.\
+                    check_launch_response_status(response,
+                                                 verbose,
+                                                 200)
                 if isError:
                     errMsg = taputils.get_http_response_error(response)
                     print(response.status, errMsg)
@@ -340,9 +341,10 @@ class Job(object):
 
         resultsResponse = self.__handle_redirect_if_required(resultsResponse,
                                                              debug)
-        isError = self.connHandler.check_launch_response_status(resultsResponse,
-                                                                debug,
-                                                                200)
+        isError = self.connHandler.\
+            check_launch_response_status(resultsResponse,
+                                         debug,
+                                         200)
         self._phase = phase
         if phase == 'ERROR':
             errMsg = self.get_error(debug)
@@ -364,8 +366,8 @@ class Job(object):
         while ((resultsResponse.status == 303 or
                 resultsResponse.status == 302) and
                 numberOfRedirects < 20):
-            joblocation = self.connHandler.find_header(resultsResponse.getheaders(),
-                                                       "location")
+            joblocation = self.connHandler.\
+                find_header(resultsResponse.getheaders(), "location")
             if verbose:
                 print("Redirecting to: " + str(joblocation))
             resultsResponse = self.connHandler.execute_tapget(joblocation)
@@ -402,8 +404,8 @@ class Job(object):
         else:
             if resultsResponse.status == 303 or resultsResponse.status == 302:
                 # get location
-                location = self.connHandler.find_header(resultsResponse.getheaders(),
-                                                        "location")
+                location = self.connHandler.\
+                    find_header(resultsResponse.getheaders(), "location")
                 if location is None:
                     raise requests.exceptions.HTTPError("No location found " +
                                                         "after redirection " +
@@ -415,12 +417,12 @@ class Job(object):
                                                                     self.jobid)
                 relativeLocationSubContext = "async/" + str(self.jobid) +\
                     "/" + str(relativeLocation)
-                response = self.connHandler.execute_tapget(relativeLocationSubContext)
+                response = self.connHandler.\
+                    execute_tapget(relativeLocationSubContext)
                 response = self.__handle_redirect_if_required(response,
                                                               verbose)
-                isError = self.connHandler.check_launch_response_status(response,
-                                                                        verbose,
-                                                                        200)
+                isError = self.connHandler.\
+                    check_launch_response_status(response, verbose, 200)
                 if isError:
                     errMsg = taputils.get_http_response_error(resultsResponse)
                     print(resultsResponse.status, errMsg)
@@ -434,7 +436,9 @@ class Job(object):
         """Returns whether the job is finished (ERROR, ABORTED, COMPLETED) or not
 
         """
-        if self._phase == 'ERROR' or self._phase == 'ABORTED' or self._phase == 'COMPLETED':
+        if (self._phase == 'ERROR' or
+                self._phase == 'ABORTED' or
+                self._phase == 'COMPLETED'):
             return True
         else:
             return False
