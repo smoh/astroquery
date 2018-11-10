@@ -89,9 +89,9 @@ class Tap(object):
         verbose : bool, optional, default 'False'
             flag to display information about the process
         """
-        self.__internalInit()
+        self.connhandler = None
         if url is not None:
-            protocol, host, port, server, tap = self.__parseUrl(url)
+            protocol, host, port, server, tap = Tap.parseUrl(url)
             if server_context is None:
                 server_context = server
             if tap_context is None:
@@ -107,7 +107,7 @@ class Tap(object):
                               datalink_context=datalink_context,
                               port=port,
                               sslport=sslport)
-                self.__connHandler = tap
+                self.connhandler = tap
             else:
                 # https port -> sslPort
                 tap = TapConn(ishttps=True,
@@ -120,7 +120,7 @@ class Tap(object):
                               datalink_context=datalink_context,
                               port=port,
                               sslport=port)
-                self.__connHandler = tap
+                self.connhandler = tap
         else:
             tap = TapConn(ishttps=default_protocol_is_https,
                           host=host,
@@ -132,16 +132,13 @@ class Tap(object):
                           datalink_context=datalink_context,
                           port=port,
                           sslport=sslport)
-            self.__connHandler = tap
+            self.connhandler = tap
         # if connectionHandler is set, use it (useful for testing)
         if connhandler is not None:
-            self.__connHandler = connhandler
+            self.connhandler = connhandler
         if verbose:
             print("Created TAP+ (v" + VERSION + ") - Connection:\n" +
-                  str(self.__connHandler))
-
-    def __internalInit(self):
-        self.__connHandler = None
+                  str(self.connhandler))
 
     def load_tables(self, verbose=False):
         """Loads all public tables
@@ -155,7 +152,23 @@ class Tap(object):
         -------
         A list of table objects
         """
-        return self.__load_tables(verbose=verbose)
+        print("Retrieving tables...")
+        response = self.connhandler.execute_tapget("tables",
+                                                     verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+        isError = self.connhandler.check_launch_response_status(response,
+                                                                  verbose,
+                                                                  200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+        print("Parsing tables...")
+        tsp = TableSaxParser()
+        tsp.parseData(response)
+        print("Done.")
+        return tsp.get_tables()
 
     def load_table(self, table, verbose=False):
         """Loads the specified table
@@ -172,11 +185,11 @@ class Tap(object):
         A table object
         """
         print("Retrieving table '"+str(table)+"'")
-        response = self.__connHandler.execute_tapget("tables?tables=" + table,
+        response = self.connhandler.execute_tapget("tables?tables=" + table,
                                                      verbose=verbose)
         if verbose:
             print(response.status, response.reason)
-        isError = self.__connHandler.check_launch_response_status(response,
+        isError = self.connhandler.check_launch_response_status(response,
                                                                   verbose,
                                                                   200)
         if isError:
@@ -189,57 +202,6 @@ class Tap(object):
         tsp.parseData(response)
         print("Done.")
         return tsp.get_table()
-
-    def __load_tables(self, only_names=False, include_shared_tables=False,
-                      verbose=False):
-        """Loads all public tables
-
-        Parameters
-        ----------
-        only_names : bool, TAP+ only, optional, default 'False'
-            True to load table names only
-        include_shared_tables : bool, TAP+, optional, default 'False'
-            True to include shared tables
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A list of table objects
-        """
-        # share_info=true&share_accessible=true&only_tables=true
-        flags = ""
-        addedItem = False
-        if only_names:
-            flags = "only_tables=true"
-            addedItem = True
-        if include_shared_tables:
-            if addedItem:
-                flags += "&"
-            flags += "share_accessible=true"
-            addedItem = True
-        print("Retrieving tables...")
-        if flags != "":
-            response = self.__connHandler.execute_tapget("tables?"+flags,
-                                                         verbose=verbose)
-        else:
-            response = self.__connHandler.execute_tapget("tables",
-                                                         verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-        isError = self.__connHandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  200)
-        if isError:
-            errMsg = taputils.get_http_response_error(response)
-            print(response.status, errMsg)
-            raise requests.exceptions.HTTPError(errMsg)
-            return None
-        print("Parsing tables...")
-        tsp = TableSaxParser()
-        tsp.parseData(response)
-        print("Done.")
-        return tsp.get_tables()
 
     def launch_job(self, query, name=None, output_file=None,
                    output_format="votable", verbose=False,
@@ -277,7 +239,7 @@ class Tap(object):
             if upload_table_name is None:
                 raise ValueError("Table name is required when a resource " +
                                  "is uploaded")
-            response = self.__launchJobMultipart(query,
+            response = self._launchJobMultipart(query,
                                                  upload_resource,
                                                  upload_table_name,
                                                  output_format,
@@ -285,7 +247,7 @@ class Tap(object):
                                                  verbose,
                                                  name)
         else:
-            response = self.__launchJob(query,
+            response = self._launchJob(query,
                                         output_format,
                                         "sync",
                                         verbose,
@@ -295,7 +257,7 @@ class Tap(object):
             # redirection
             if verbose:
                 print("Redirection found")
-            location = self.__connHandler.find_header(
+            location = self.connhandler.find_header(
                 response.getheaders(),
                 "location")
             if location is None:
@@ -304,15 +266,15 @@ class Tap(object):
                                                     "received (303)")
             if verbose:
                 print("Redirect to %s", location)
-            subcontext = self.__extract_sync_subcontext(location)
-            response = self.__connHandler.execute_tapget(subcontext,
+            subcontext = self._extract_sync_subcontext(location)
+            response = self.connhandler.execute_tapget(subcontext,
                                                          verbose=verbose)
-        job = Job(async_job=False, query=query, connhandler=self.__connHandler)
-        isError = self.__connHandler.check_launch_response_status(response,
+        job = Job(async_job=False, query=query, connhandler=self.connhandler)
+        isError = self.connhandler.check_launch_response_status(response,
                                                                   verbose,
                                                                   200)
         headers = response.getheaders()
-        suitableOutputFile = self.__getSuitableOutputFile(False,
+        suitableOutputFile = self._getSuitableOutputFile(False,
                                                           output_file,
                                                           headers,
                                                           isError,
@@ -327,7 +289,7 @@ class Tap(object):
             responseBytes = response.read()
             responseStr = responseBytes.decode('utf-8')
             if dump_to_file:
-                self.__connHandler.dump_to_file(suitableOutputFile,
+                self.connhandler.dump_to_file(suitableOutputFile,
                                                 responseStr)
             raise requests.exceptions.HTTPError(
                 taputils.parse_http_response_error(responseStr,
@@ -336,7 +298,7 @@ class Tap(object):
             if verbose:
                 print("Retrieving sync. results...")
             if dump_to_file:
-                self.__connHandler.dump_to_file(suitableOutputFile, response)
+                self.connhandler.dump_to_file(suitableOutputFile, response)
             else:
                 results = utils.read_http_response(response, output_format)
                 job.set_results(results)
@@ -387,7 +349,7 @@ class Tap(object):
             if upload_table_name is None:
                 raise ValueError(
                     "Table name is required when a resource is uploaded")
-            response = self.__launchJobMultipart(query,
+            response = self._launchJobMultipart(query,
                                                  upload_resource,
                                                  upload_table_name,
                                                  output_format,
@@ -396,18 +358,18 @@ class Tap(object):
                                                  name,
                                                  autorun)
         else:
-            response = self.__launchJob(query,
+            response = self._launchJob(query,
                                         output_format,
                                         "async",
                                         verbose,
                                         name,
                                         autorun)
-        isError = self.__connHandler.check_launch_response_status(response,
+        isError = self.connhandler.check_launch_response_status(response,
                                                                   verbose,
                                                                   303)
-        job = Job(async_job=True, query=query, connhandler=self.__connHandler)
+        job = Job(async_job=True, query=query, connhandler=self.connhandler)
         headers = response.getheaders()
-        suitableOutputFile = self.__getSuitableOutputFile(True,
+        suitableOutputFile = self._getSuitableOutputFile(True,
                                                           output_file,
                                                           headers,
                                                           isError,
@@ -422,11 +384,11 @@ class Tap(object):
             if dump_to_file:
                 responseBytes = response.read()
                 responseStr = responseBytes.decode('utf-8')
-                self.__connHandler.dump_to_file(suitableOutputFile,
+                self.connhandler.dump_to_file(suitableOutputFile,
                                                 responseStr)
             raise requests.exceptions.HTTPError(response.reason)
         else:
-            location = self.__connHandler.find_header(
+            location = self.connhandler.find_header(
                 response.getheaders(),
                 "location")
             jobid = taputils.get_jobid_from_location(location)
@@ -478,12 +440,12 @@ class Tap(object):
             print("No job identifier found")
             return None
         subContext = "async/" + str(jobid)
-        response = self.__connHandler.execute_tapget(subContext,
+        response = self.connhandler.execute_tapget(subContext,
                                                      verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
-        isError = self.__connHandler.check_launch_response_status(response,
+        isError = self.connhandler.check_launch_response_status(response,
                                                                   verbose,
                                                                   200)
         if isError:
@@ -494,7 +456,7 @@ class Tap(object):
         # parse job
         jsp = JobSaxParser(async_job=True)
         job = jsp.parseData(response)[0]
-        job.connHandler = self.__connHandler
+        job.connHandler = self.connhandler
         # load resulst
         if load_results:
             job.get_results()
@@ -513,12 +475,12 @@ class Tap(object):
         A list of Job objects
         """
         subContext = "async"
-        response = self.__connHandler.execute_tapget(subContext,
+        response = self.connhandler.execute_tapget(subContext,
                                                      verbose=verbose)
         if verbose:
             print(response.status, response.reason)
             print(response.getheaders())
-        isError = self.__connHandler.check_launch_response_status(response,
+        isError = self.connhandler.check_launch_response_status(response,
                                                                   verbose,
                                                                   200)
         if isError:
@@ -531,11 +493,12 @@ class Tap(object):
         jobs = jsp.parseData(response)
         if jobs is not None:
             for j in jobs:
-                j.connHandler = self.__connHandler
+                j.connHandler = self.connhandler
         return jobs
 
-    def __appendData(self, args):
-        data = self.__connHandler.url_encode(args)
+    # NOTE: this method is used once and only once within class.
+    def _appendData(self, args):
+        data = self.connhandler.url_encode(args)
         result = ""
         firtsTime = True
         for k in data:
@@ -546,19 +509,7 @@ class Tap(object):
                 result = result + "&" + k + '=' + data[k]
         return result
 
-    def save_results(self, job, verbose=False):
-        """Saves job results
-
-        Parameters
-        ----------
-        job : Job, mandatory
-            job
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-        """
-        job.save_results(verbose=verbose)
-
-    def __launchJobMultipart(self, query, uploadResource, uploadTableName,
+    def _launchJobMultipart(self, query, uploadResource, uploadTableName,
                              outputFormat, context, verbose, name=None,
                              autorun=True):
         uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
@@ -589,8 +540,8 @@ class Tap(object):
             f.close()
             name = os.path.basename(uploadResource)
         files = [[uploadTableName, name, chunk]]
-        contentType, body = self.__connHandler.encode_multipart(args, files)
-        response = self.__connHandler.execute_tappost(context,
+        contentType, body = self.connhandler.encode_multipart(args, files)
+        response = self.connhandler.execute_tappost(context,
                                                       body,
                                                       contentType,
                                                       verbose)
@@ -599,7 +550,7 @@ class Tap(object):
             print(response.getheaders())
         return response
 
-    def __launchJob(self, query, outputFormat, context, verbose, name=None,
+    def _launchJob(self, query, outputFormat, context, verbose, name=None,
                     autorun=True):
         args = {
             "REQUEST": "doQuery",
@@ -611,8 +562,8 @@ class Tap(object):
             args['PHASE'] = 'RUN'
         if name is not None:
             args['jobname'] = name
-        data = self.__connHandler.url_encode(args)
-        response = self.__connHandler.execute_tappost(subcontext=context,
+        data = self.connhandler.url_encode(args)
+        response = self.connhandler.execute_tappost(subcontext=context,
                                                       data=data,
                                                       verbose=verbose)
         if verbose:
@@ -620,16 +571,16 @@ class Tap(object):
             print(response.getheaders())
         return response
 
-    def __getSuitableOutputFile(self, async_job, outputFile, headers, isError,
+    def _getSuitableOutputFile(self, async_job, outputFile, headers, isError,
                                 output_format):
         dateTime = datetime.now().strftime("%Y%m%d%H%M%S")
-        ext = self.__connHandler.get_suitable_extension(headers)
+        ext = self.connhandler.get_suitable_extension(headers)
         fileName = ""
         if outputFile is None:
             if not async_job:
                 fileName = "sync_" + str(dateTime) + ext
             else:
-                ext = self.__connHandler.get_suitable_extension_by_format(
+                ext = self.connhandler.get_suitable_extension_by_format(
                     output_format)
                 fileName = "async_" + str(dateTime) + ext
         else:
@@ -638,26 +589,20 @@ class Tap(object):
             fileName += ".error"
         return fileName
 
-    def __extract_sync_subcontext(self, location):
+    # NOTE: this method is used once and only once within class.
+    def _extract_sync_subcontext(self, location):
         pos = location.find('sync')
         if pos < 0:
             return location
         return location[pos:]
 
-    def __findCookieInHeader(self, headers, verbose=False):
-        cookies = self.__connHandler.find_header(headers, 'Set-Cookie')
-        if verbose:
-            print(cookies)
-        if cookies is None:
-            return None
-        else:
-            items = cookies.split(';')
-            for i in items:
-                if i.startswith("JSESSIONID="):
-                    return i
-        return None
-
-    def __parseUrl(self, url, verbose=False):
+    @staticmethod
+    def parseUrl(url, verbose=False):
+        """
+        Parse TAP url [http(s)://]host[:port][/server_context][/tap_context]
+        
+        Returns (protocol, host, port, serverContext, tapContext)
+        """
         isHttps = False
         if url.startswith("https://"):
             isHttps = True
@@ -723,7 +668,7 @@ class Tap(object):
 
     def __str__(self):
         return ("Created TAP+ (v"+VERSION+") - Connection:\n" +
-                str(self.__connHandler))
+                str(self.connhandler))
 
 
 class TapPlus(Tap):
@@ -786,9 +731,7 @@ class TapPlus(Tap):
                                       default_protocol_is_https=default_protocol_is_https,  # noqa
                                       connhandler=connhandler,
                                       verbose=verbose)
-        self.__internalInit()
 
-    def __internalInit(self):
         self.__user = None
         self.__pwd = None
         self.__isLoggedIn = False
@@ -810,9 +753,39 @@ class TapPlus(Tap):
         -------
         A list of table objects
         """
-        return self._Tap__load_tables(only_names=only_names,
-                                      include_shared_tables=include_shared_tables,  # noqa
-                                      verbose=verbose)
+        # share_info=true&share_accessible=true&only_tables=true
+        flags = ""
+        addedItem = False
+        if only_names:
+            flags = "only_tables=true"
+            addedItem = True
+        if include_shared_tables:
+            if addedItem:
+                flags += "&"
+            flags += "share_accessible=true"
+            addedItem = True
+        print("Retrieving tables...")
+        if flags != "":
+            response = self.connhandler.execute_tapget("tables?"+flags,
+                                                         verbose=verbose)
+        else:
+            response = self.connhandler.execute_tapget("tables",
+                                                         verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+        isError = self.connhandler.check_launch_response_status(response,
+                                                                  verbose,
+                                                                  200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        print("Parsing tables...")
+        tsp = TableSaxParser()
+        tsp.parseData(response)
+        print("Done.")
+        return tsp.get_tables()
 
     def load_data(self, params_dict=None, output_file=None, verbose=False):
         """Loads the specified data
@@ -833,7 +806,7 @@ class TapPlus(Tap):
         None if output_file is not None.
         """
         print("Retrieving data.")
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         if not isinstance(params_dict, dict):
             raise ValueError("Parameters dictionary expected")
         data = connHandler.url_encode(params_dict)
@@ -880,7 +853,7 @@ class TapPlus(Tap):
         A set of groups of a user
         """
         context = "share?action=GetGroups"
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_tapget(context, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -939,7 +912,7 @@ class TapPlus(Tap):
         A set of shared items
         """
         context = "share?action=GetSharedItems"
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_tapget(context, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -996,7 +969,7 @@ class TapPlus(Tap):
                 str(description) +
                 "&items_list=" +
                 group.id + "|Group|Read")
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_share(data, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1050,7 +1023,7 @@ class TapPlus(Tap):
         data = ("action=RemoveItem&resource_type=0&resource_id=" +
                 str(shared_item.id) +
                 "&resource_type=0")
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_share(data, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1091,7 +1064,7 @@ class TapPlus(Tap):
                 str(group_name) +
                 "&description=" +
                 str(description))
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_share(data, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1126,7 +1099,7 @@ class TapPlus(Tap):
             raise ValueError("Group '" + group_name + "' doesn't exist")
         data = ("action=RemoveGroup&resource_type=0&group_id=" +
                 str(group.id))
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_share(data, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1182,7 +1155,7 @@ class TapPlus(Tap):
                 str(group.title) + "&description=" +
                 str(group.description) + "&users_list=" +
                 str(users))
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_share(data, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1240,7 +1213,7 @@ class TapPlus(Tap):
                 str(group.title) + "&description=" +
                 str(group.description) + "&users_list=" +
                 str(users))
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_share(data, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1275,7 +1248,7 @@ class TapPlus(Tap):
         if user_id is None:
             raise ValueError("'user_id' must be specified")
         context = "users?USER=" + str(user_id)
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_tapget(context, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1320,7 +1293,7 @@ class TapPlus(Tap):
                 ids_arg = "ID=" + ','.join(str(item) for item in ids)
         if verbose:
             print("Datalink request: " + ids_arg)
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_datalinkpost(subcontext="links",
                                                     data=ids_arg,
                                                     verbose=verbose)
@@ -1357,8 +1330,8 @@ class TapPlus(Tap):
         if jobfilter is not None:
             data = jobfilter.createUrlRequest()
             if data is not None:
-                subContext = subContext + '?' + self.__appendData(data)
-        connHandler = self.__getconnhandler()
+                subContext = subContext + '?' + self._appendData(data)
+        connHandler = self.connhandler
         response = connHandler.execute_tapget(subContext, verbose=verbose)
         if verbose:
             print(response.status, response.reason)
@@ -1403,7 +1376,7 @@ class TapPlus(Tap):
             print("Jobs to be removed: " + str(jobsIds))
         data = "JOB_IDS=" + jobsIds
         subContext = "deletejobs"
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         response = connHandler.execute_tappost(subContext,
                                                data,
                                                verbose=verbose)
@@ -1467,7 +1440,7 @@ class TapPlus(Tap):
         verbose : bool, optional, default 'False'
             flag to display information about the process
         """
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         url = connHandler.get_host_url()
         loginDialog = LoginDialog(url)
         loginDialog.show_login()
@@ -1483,7 +1456,7 @@ class TapPlus(Tap):
         self.__isLoggedIn = False
         response = self.__execLogin(self.__user, self.__pwd, verbose)
         # check response
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         isError = connHandler.check_launch_response_status(response,
                                                            verbose,
                                                            200)
@@ -1493,7 +1466,7 @@ class TapPlus(Tap):
             raise requests.exceptions.HTTPError(errMsg)
         else:
             # extract cookie
-            cookie = self._Tap__findCookieInHeader(response.getheaders())
+            cookie = self._findCookieInHeader(response.getheaders())
             if cookie is not None:
                 self.__isLoggedIn = True
                 connHandler.set_cookie(cookie)
@@ -1509,7 +1482,7 @@ class TapPlus(Tap):
         """
         subContext = "logout"
         args = {}
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         data = connHandler.url_encode(args)
         response = connHandler.execute_secure(subContext, data)
         if verbose:
@@ -1522,7 +1495,7 @@ class TapPlus(Tap):
         args = {
             "username": usr,
             "password": pwd}
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         data = connHandler.url_encode(args)
         response = connHandler.execute_secure(subContext, data, verbose)
         if verbose:
@@ -1566,13 +1539,13 @@ class TapPlus(Tap):
                                                resource_format=format,
                                                verbose=verbose)
         if response.status == 303:
-            location = self.__getconnhandler().find_header(
+            location = self.connhandler.find_header(
                 response.getheaders(),
                 "location")
             jobid = taputils.get_jobid_from_location(location)
             job = Job(async_job=True,
                       query=None,
-                      connhandler=self.__getconnhandler())
+                      connhandler=self.connhandler)
             job.jobid = jobid
             job.name = 'Table upload'
             job.set_phase('EXECUTING')
@@ -1587,7 +1560,7 @@ class TapPlus(Tap):
                                table_description=None,
                                resource_format="VOTable",
                                verbose=False):
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         if isinstance(resource, Table):
             args = {
                 "TASKID": str(-1),
@@ -1691,7 +1664,7 @@ class TapPlus(Tap):
             "TABLE_DESC": str(table_description),
             "FORMAT": str(format)}
         files = [['FILE', "", ""]]
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         contentType, body = connHandler.encode_multipart(args, files)
         response = connHandler.execute_upload(body, contentType)
         if verbose:
@@ -1732,7 +1705,7 @@ class TapPlus(Tap):
                     "TABLE_NAME": str(table_name),
                     "DELETE": "TRUE",
                     "FORCE_REMOVAL": "FALSE"}
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         data = connHandler.url_encode(args)
         response = connHandler.execute_upload(data, verbose=verbose)
         if verbose:
@@ -1906,7 +1879,7 @@ class TapPlus(Tap):
             args["TABLE0_COL" + str(index) + "_UCD"] = str(ucd)
             args["TABLE0_COL" + str(index) + "_UTYPE"] = str(utype)
             index = index + 1
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         data = connHandler.url_encode(args)
         response = connHandler.execute_table_edit(data, verbose=verbose)
         if verbose:
@@ -1953,7 +1926,7 @@ class TapPlus(Tap):
                 "RA": str(ra_column_name),
                 "DEC": str(dec_column_name),
                 }
-        connHandler = self.__getconnhandler()
+        connHandler = self.connhandler
         data = connHandler.url_encode(args)
         response = connHandler.execute_table_edit(data, verbose=verbose)
         isError = connHandler.check_launch_response_status(response,
@@ -2000,5 +1973,16 @@ class TapPlus(Tap):
                         break
         return c
 
-    def __getconnhandler(self):
-        return self._Tap__connHandler
+    def _findCookieInHeader(self, headers, verbose=False):
+        cookies = self.connhandler.find_header(headers, 'Set-Cookie')
+        if verbose:
+            print(cookies)
+        if cookies is None:
+            return None
+        else:
+            items = cookies.split(';')
+            for i in items:
+                if i.startswith("JSESSIONID="):
+                    return i
+        return None
+
