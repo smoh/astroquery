@@ -14,7 +14,6 @@ Created on 30 jun. 2016
 
 
 """
-import unittest
 import os
 import numpy as np
 import pytest
@@ -31,7 +30,7 @@ def data_path(filename):
     return os.path.join(data_dir, filename)
 
 
-class TestTap(unittest.TestCase):
+class TestTap(object):
 
     def test_load_tables(self):
         connHandler = DummyConnHandler()
@@ -834,8 +833,3 @@ class TestTap(unittest.TestCase):
             "Wrong dataType for results column '%s'. " +\
             "Expected: '%s', found '%s'" % \
             (columnName, dataType, c.dtype)
-
-
-if __name__ == "__main__":
-    # import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
