@@ -266,7 +266,11 @@ class Tap(object):
                                                     "received (303)")
             if verbose:
                 print("Redirect to %s", location)
-            subcontext = self._extract_sync_subcontext(location)
+            pos = location.find('sync')
+            if pos < 0:
+                subcontext = location
+            else:
+                subcontext = location[pos:]
             response = self.connhandler.execute_tapget(subcontext,
                                                          verbose=verbose)
         job = Job(async_job=False, query=query, connhandler=self.connhandler)
@@ -588,13 +592,6 @@ class Tap(object):
         if isError:
             fileName += ".error"
         return fileName
-
-    # NOTE: this method is used once and only once within class.
-    def _extract_sync_subcontext(self, location):
-        pos = location.find('sync')
-        if pos < 0:
-            return location
-        return location[pos:]
 
     @staticmethod
     def parse_url(url, verbose=False):
