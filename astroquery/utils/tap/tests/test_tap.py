@@ -833,3 +833,18 @@ class TestTap(object):
             "Wrong dataType for results column '%s'. " +\
             "Expected: '%s', found '%s'" % \
             (columnName, dataType, c.dtype)
+
+    def test_parse_url(self):
+        """ test staticmethod parse_url """
+        url = "http://test:1111/tap"
+        r = TapPlus.parse_url(url)
+        assert r == ('http', 'test', 1111, '/tap', '')
+
+        url = "http://test"
+        r = TapPlus.parse_url(url)
+        assert r == ('http', 'test', 80, '', '')
+
+        url = "https://test/tap/foo/bar"
+        r = TapPlus.parse_url(url)
+        assert r == ('https', 'test', 443, '/tap/foo', '/bar')
+
