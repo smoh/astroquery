@@ -83,15 +83,18 @@ class Tap(object):
             HTTPS port
         default_protocol_is_https : bool, optional, default False
             Specifies whether the default protocol to be used is HTTPS
-        connhandler connection handler object, optional, default None
+        connhandler : connection handler object, optional, default None
             HTTP(s) connection hander (creator). If no handler is provided, a
             new one is created.
         verbose : bool, optional, default 'False'
             flag to display information about the process
         """
         self.connhandler = None
-        if url is not None:
-            protocol, host, port, server, tap = Tap.parseUrl(url)
+        # if connectionHandler is set, use it (useful for testing)
+        if connhandler is not None:
+            self.connhandler = connhandler
+        elif url is not None:
+            protocol, host, port, server, tap = Tap.parse_url(url)
             if server_context is None:
                 server_context = server
             if tap_context is None:
@@ -133,9 +136,6 @@ class Tap(object):
                           port=port,
                           sslport=sslport)
             self.connhandler = tap
-        # if connectionHandler is set, use it (useful for testing)
-        if connhandler is not None:
-            self.connhandler = connhandler
         if verbose:
             print("Created TAP+ (v" + VERSION + ") - Connection:\n" +
                   str(self.connhandler))
@@ -214,7 +214,7 @@ class Tap(object):
         query : str, mandatory
             query to be executed
         output_file : str, optional, default None
-            file name where the results are saved if dumpToFile is True.
+            file name where the results are saved if dump_to_file is True.
             If this parameter is not provided, the jobid is used instead
         output_format : str, optional, default 'votable'
             results format
@@ -597,7 +597,7 @@ class Tap(object):
         return location[pos:]
 
     @staticmethod
-    def parseUrl(url, verbose=False):
+    def parse_url(url, verbose=False):
         """
         Parse TAP url [http(s)://]host[:port][/server_context][/tap_context]
         
