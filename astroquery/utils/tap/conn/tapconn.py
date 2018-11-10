@@ -80,7 +80,22 @@ class TapConn(object):
             HTTP(s) connection hander (creator). If no handler is provided, a
             new one is created.
         """
-        self.__interna_init()
+        self.__connectionHandler = None
+        self.__isHttps = False
+        self.__connHost = ""
+        self.__connPort = 80
+        self.__connPortSsl = 443
+        self.__serverContext = None
+        self.__tapContext = None
+        self.__postHeaders = {
+            "Content-type": CONTENT_TYPE_POST_DEFAULT,
+            "Accept": "text/plain"
+            }
+        self.__getHeaders = {}
+        self.__cookie = None
+        self.__currentStatus = 0
+        self.__currentReason = ""
+
         self.__isHttps = ishttps
         self.__connHost = host
         self.__connPort = port
@@ -112,24 +127,7 @@ class TapConn(object):
                 return self.__serverContext + "/" + str(context)
         else:
             return self.__serverContext
-
-    def __interna_init(self):
-        self.__connectionHandler = None
-        self.__isHttps = False
-        self.__connHost = ""
-        self.__connPort = 80
-        self.__connPortSsl = 443
-        self.__serverContext = None
-        self.__tapContext = None
-        self.__postHeaders = {
-            "Content-type": CONTENT_TYPE_POST_DEFAULT,
-            "Accept": "text/plain"
-            }
-        self.__getHeaders = {}
-        self.__cookie = None
-        self.__currentStatus = 0
-        self.__currentReason = ""
-
+       
     def __get_tap_context(self, subContext):
         return self.__tapContext + "/" + subContext
 
@@ -449,6 +447,7 @@ class TapConn(object):
         """
         return self.__currentReason
 
+    # NOTE: seems like an unnecessary method..
     def url_encode(self, data):
         """Encodes the provided dictionary
 
