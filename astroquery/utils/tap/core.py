@@ -500,19 +500,6 @@ class Tap(object):
                 j.connHandler = self.connhandler
         return jobs
 
-    # NOTE: this method is used once and only once within class.
-    def _appendData(self, args):
-        data = self.connhandler.url_encode(args)
-        result = ""
-        firtsTime = True
-        for k in data:
-            if firtsTime:
-                firtsTime = False
-                result = k + '=' + data[k]
-            else:
-                result = result + "&" + k + '=' + data[k]
-        return result
-
     def _launchJobMultipart(self, query, uploadResource, uploadTableName,
                              outputFormat, context, verbose, name=None,
                              autorun=True):
@@ -1327,7 +1314,17 @@ class TapPlus(Tap):
         if jobfilter is not None:
             data = jobfilter.createUrlRequest()
             if data is not None:
-                subContext = subContext + '?' + self._appendData(data)
+                # NOTE: this is to build key1=value1&key2=value2 string..
+                data = self.connhandler.url_encode(data)
+                result = ""
+                firtsTime = True
+                for k in data:
+                    if firtsTime:
+                        firtsTime = False
+                        result = k + '=' + data[k]
+                    else:
+                        result = result + "&" + k + '=' + data[k]
+                subContext = subContext + '?' + result
         connHandler = self.connhandler
         response = connHandler.execute_tapget(subContext, verbose=verbose)
         if verbose:
