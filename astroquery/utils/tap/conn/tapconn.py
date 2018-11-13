@@ -30,6 +30,9 @@ from astropy.extern.six.moves.urllib.parse import urlencode
 import mimetypes
 import time
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 __all__ = ['TapConn']
 
@@ -234,9 +237,10 @@ class TapConn(object):
 
     def __execute_get(self, context, verbose=False):
         conn = self.__get_connection(verbose)
-        if verbose:
-            print("host = " + str(conn.host) + ":" + str(conn.port))
-            print("context = " + context)
+        logger.debug(
+            "host = " + str(conn.host) + ":" + str(conn.port)\
+            + "context = " + context
+        )
         conn.request("GET", context, None, self.__getHeaders)
         response = conn.getresponse()
         self.__currentReason = response.reason

@@ -33,6 +33,9 @@ import os
 from astropy.table.table import Table
 import tempfile
 
+import requests
+import logging
+logger = logging.getLogger(__name__)
 
 __all__ = ['Tap', 'TapPlus']
 
@@ -136,9 +139,23 @@ class Tap(object):
                           port=port,
                           sslport=sslport)
             self.connhandler = tap
+        # logger.info(
+        #     "host {:s} server {:s} tap {:s}".format(host, server_context, tap_context)
+        # )
+        self.protocol = 'https' if default_protocol_is_https else 'http'
+        self.host = host
+        # TODO: is server_context and tap_context ever separately used?
+        self.server_context = server_context if server_context else ''
+        self.tap_context = tap_context if tap_context else ''
+        logger.info('{s.host} {s.server_context} {s.tap_context}'.format(s=self))
+        self.session = requests.Session()
         if verbose:
             print("Created TAP+ (v" + VERSION + ") - Connection:\n" +
                   str(self.connhandler))
+    
+    @property
+    def tap_endpoint(self):
+        return "{s.protocol:s}://{s.host:s}/{s.server_context}/{s.tap_context}".format(s=self)
 
     def load_tables(self, verbose=False):
         """Loads all public tables
@@ -152,22 +169,14 @@ class Tap(object):
         -------
         A list of table objects
         """
-        print("Retrieving tables...")
-        response = self.connhandler.execute_tapget("tables",
-                                                     verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-        isError = self.connhandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  200)
-        if isError:
-            errMsg = taputils.get_http_response_error(response)
-            print(response.status, errMsg)
-            raise requests.exceptions.HTTPError(errMsg)
-        print("Parsing tables...")
+        response = self.session.get("{s.tap_endpoint}/tables".format(s=self))
+        if not response.ok:
+            raise
+            # errMsg = taputils.get_http_response_error(response)
+            # print(response.status, errMsg)
+            # raise requests.exceptions.HTTPError(errMsg)
         tsp = TableSaxParser()
-        tsp.parseData(response)
-        print("Done.")
+        tsp.parseData(response.content)
         return tsp.get_tables()
 
     def load_table(self, table, verbose=False):
@@ -184,23 +193,15 @@ class Tap(object):
         -------
         A table object
         """
-        print("Retrieving table '"+str(table)+"'")
-        response = self.connhandler.execute_tapget("tables?tables=" + table,
-                                                     verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-        isError = self.connhandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  200)
-        if isError:
-            errMsg = taputils.get_http_response_error(response)
-            print(response.status, errMsg)
-            raise requests.exceptions.HTTPError(errMsg)
-            return None
-        print("Parsing table '"+str(table)+"'...")
+        response = self.session.get("{s.tap_endpoint:s}/tables?table={table:s}".format(
+            s=self, table=table))
+        if not response.ok:
+            raise
+            # errMsg = taputils.get_http_response_error(response)
+            # print(response.status, errMsg)
+            # raise requests.exceptions.HTTPError(errMsg)
         tsp = TableSaxParser()
-        tsp.parseData(response)
-        print("Done.")
+        tsp.parseData(response.content)
         return tsp.get_table()
 
     def launch_job(self, query, name=None, output_file=None,
