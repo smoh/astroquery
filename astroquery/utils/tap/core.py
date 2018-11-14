@@ -233,6 +233,7 @@ class Tap(object):
             "FORMAT": str(outputFormat),
             "tapclient": str(TAP_CLIENT_ID),
             "QUERY": str(query)}
+        # TODO: is autorun even necessary for sync jobs?
         if autorun is True:
             args['PHASE'] = 'RUN'
         if name is not None:
