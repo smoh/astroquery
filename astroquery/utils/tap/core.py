@@ -155,6 +155,9 @@ class Tap(object):
     
     @property
     def tap_endpoint(self):
+        logger.debug(self.host)
+        logger.debug(self.server_context)
+        logger.debug(self.tap_context)
         return "{s.protocol:s}://{s.host:s}/{s.server_context}/{s.tap_context}".format(s=self)
 
     # TODO: make this a cached property?
@@ -222,25 +225,63 @@ class Tap(object):
         A Job object
         """
         query = taputils.set_top_in_query(query, 2000)
-        if verbose:
-            print("Launched query: '"+str(query)+"'")
+
+        url = self.tap_endpoint + '/sync'
+        args = {
+            "REQUEST": "doQuery",
+            "LANG": "ADQL",
+            "FORMAT": str(outputFormat),
+            "tapclient": str(TAP_CLIENT_ID),
+            "QUERY": str(query)}
+        if autorun is True:
+            args['PHASE'] = 'RUN'
+        if name is not None:
+            args['jobname'] = name
         if upload_resource is not None:
             if upload_table_name is None:
                 raise ValueError("Table name is required when a resource " +
                                  "is uploaded")
-            response = self._launchJobMultipart(query,
-                                                 upload_resource,
-                                                 upload_table_name,
-                                                 output_format,
-                                                 "sync",
-                                                 verbose,
-                                                 name)
+
+
+        uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
+        #, "UPLOAD": ""+str(uploadValue) 
+        if isinstance(uploadResource, Table):
+            fh = tempfile.NamedTemporaryFile(delete=False)
+            uploadResource.write(fh, format='votable')
+            fh.close()
+            f = open(fh.name, "r")
+            chunk = f.read()
+            f.close()
+            os.unlink(fh.name)
+            name = 'pytable'
+            args['format'] = 'votable'
         else:
-            response = self._launchJob(query,
-                                        output_format,
-                                        "sync",
-                                        verbose,
-                                        name)
+            f = open(uploadResource, "r")
+            chunk = f.read()
+            f.close()
+            name = os.path.basename(uploadResource)
+        files = [[uploadTableName, name, chunk]]
+        contentType, body = self.connhandler.encode_multipart(args, files)
+        response = self.connhandler.execute_tappost(context,
+                                                      body,
+                                                      contentType,
+                                                      verbose)
+
+        #     response = self._launchJobMultipart(query,
+        #                                          upload_resource,
+        #                                          upload_table_name,
+        #                                          output_format,
+        #                                          "sync",
+        #                                          verbose,
+        #                                          name)
+        # else:
+        #     response = self._launchJob(query,
+        #                                 output_format,
+        #                                 "sync",
+        #                                 verbose,
+        #                                 name)
+        response = self.session.post(url, data=args)
+
         # handle redirection
         if response.status == 303:
             # redirection
@@ -492,18 +533,18 @@ class Tap(object):
     def _launchJobMultipart(self, query, uploadResource, uploadTableName,
                              outputFormat, context, verbose, name=None,
                              autorun=True):
-        uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
         args = {
             "REQUEST": "doQuery",
             "LANG": "ADQL",
             "FORMAT": str(outputFormat),
             "tapclient": str(TAP_CLIENT_ID),
-            "QUERY": str(query),
-            "UPLOAD": ""+str(uploadValue)}
+            "QUERY": str(query)}
         if autorun is True:
             args['PHASE'] = 'RUN'
         if name is not None:
             args['jobname'] = name
+        uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
+        #, "UPLOAD": ""+str(uploadValue) 
         if isinstance(uploadResource, Table):
             fh = tempfile.NamedTemporaryFile(delete=False)
             uploadResource.write(fh, format='votable')
@@ -525,31 +566,27 @@ class Tap(object):
                                                       body,
                                                       contentType,
                                                       verbose)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
+        # response = self.session.post(url, )
         return response
 
-    def _launchJob(self, query, outputFormat, context, verbose, name=None,
-                    autorun=True):
-        args = {
-            "REQUEST": "doQuery",
-            "LANG": "ADQL",
-            "FORMAT": str(outputFormat),
-            "tapclient": str(TAP_CLIENT_ID),
-            "QUERY": str(query)}
-        if autorun is True:
-            args['PHASE'] = 'RUN'
-        if name is not None:
-            args['jobname'] = name
-        data = self.connhandler.url_encode(args)
-        response = self.connhandler.execute_tappost(subcontext=context,
-                                                      data=data,
-                                                      verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        return response
+    # def _launchJob(self, query, outputFormat, context, verbose, name=None,
+    #                 autorun=True):
+    #     args = {
+    #         "REQUEST": "doQuery",
+    #         "LANG": "ADQL",
+    #         "FORMAT": str(outputFormat),
+    #         "tapclient": str(TAP_CLIENT_ID),
+    #         "QUERY": str(query)}
+    #     if autorun is True:
+    #         args['PHASE'] = 'RUN'
+    #     if name is not None:
+    #         args['jobname'] = name
+    #     data = self.connhandler.url_encode(args)
+    #     response = self.connhandler.execute_tappost(subcontext=context,
+    #                                                   data=data,
+    #                                                   verbose=verbose)
+        
+    #     return response.content
 
     def _getSuitableOutputFile(self, async_job, outputFile, headers, isError,
                                 output_format):
