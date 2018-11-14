@@ -193,8 +193,9 @@ class Tap(object):
         -------
         A table object
         """
-        response = self.session.get("{s.tap_endpoint:s}/tables?table={table:s}".format(
-            s=self, table=table))
+        url = "{s.tap_endpoint:s}/tables?tables={table:s}".format(
+            s=self, table=table)
+        response = self.session.get(url)
         if not response.ok:
             raise
             # errMsg = taputils.get_http_response_error(response)
