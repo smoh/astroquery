@@ -157,37 +157,28 @@ class Tap(object):
     def tap_endpoint(self):
         return "{s.protocol:s}://{s.host:s}/{s.server_context}/{s.tap_context}".format(s=self)
 
-    def load_tables(self, verbose=False):
+    # TODO: make this a cached property?
+    # TODO: actually found this to return private tables, too when logged in.
+    def load_tables(self):
         """Loads all public tables
-
-        Parameters
-        ----------
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
 
         Returns
         -------
         A list of table objects
         """
         response = self.session.get("{s.tap_endpoint}/tables".format(s=self))
-        if not response.ok:
-            raise
-            # errMsg = taputils.get_http_response_error(response)
-            # print(response.status, errMsg)
-            # raise requests.exceptions.HTTPError(errMsg)
-        tsp = TableSaxParser()
-        tsp.parseData(response.content)
-        return tsp.get_tables()
+        if not response.raise_for_status():
+            tsp = TableSaxParser()
+            tsp.parseData(response.content)
+            return tsp.get_tables()
 
-    def load_table(self, table, verbose=False):
+    def load_table(self, table):
         """Loads the specified table
 
         Parameters
         ----------
         table : str, mandatory
             full qualified table name (i.e. schema name + table name)
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
 
         Returns
         -------
@@ -196,14 +187,10 @@ class Tap(object):
         url = "{s.tap_endpoint:s}/tables?tables={table:s}".format(
             s=self, table=table)
         response = self.session.get(url)
-        if not response.ok:
-            raise
-            # errMsg = taputils.get_http_response_error(response)
-            # print(response.status, errMsg)
-            # raise requests.exceptions.HTTPError(errMsg)
-        tsp = TableSaxParser()
-        tsp.parseData(response.content)
-        return tsp.get_table()
+        if not response.raise_for_status():
+            tsp = TableSaxParser()
+            tsp.parseData(response.content)
+            return tsp.get_table()
 
     def launch_job(self, query, name=None, output_file=None,
                    output_format="votable", verbose=False,
