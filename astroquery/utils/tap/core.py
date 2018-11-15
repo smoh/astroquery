@@ -378,45 +378,6 @@ class Tap(object):
                 j.connHandler = self.connhandler
         return jobs
 
-    def _launchJobMultipart(self, query, uploadResource, uploadTableName,
-                             outputFormat, context, verbose, name=None,
-                             autorun=True):
-        args = {
-            "REQUEST": "doQuery",
-            "LANG": "ADQL",
-            "FORMAT": str(outputFormat),
-            "tapclient": str(TAP_CLIENT_ID),
-            "QUERY": str(query)}
-        if autorun is True:
-            args['PHASE'] = 'RUN'
-        if name is not None:
-            args['jobname'] = name
-        uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
-        #, "UPLOAD": ""+str(uploadValue) 
-        if isinstance(uploadResource, Table):
-            fh = tempfile.NamedTemporaryFile(delete=False)
-            uploadResource.write(fh, format='votable')
-            fh.close()
-            f = open(fh.name, "r")
-            chunk = f.read()
-            f.close()
-            os.unlink(fh.name)
-            name = 'pytable'
-            args['format'] = 'votable'
-        else:
-            f = open(uploadResource, "r")
-            chunk = f.read()
-            f.close()
-            name = os.path.basename(uploadResource)
-        files = [[uploadTableName, name, chunk]]
-        contentType, body = self.connhandler.encode_multipart(args, files)
-        response = self.connhandler.execute_tappost(context,
-                                                      body,
-                                                      contentType,
-                                                      verbose)
-        # response = self.session.post(url, )
-        return response
-
     def _getSuitableOutputFile(self, async_job, outputFile, headers, isError,
                                 output_format):
         dateTime = datetime.now().strftime("%Y%m%d%H%M%S")
