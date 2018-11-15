@@ -200,7 +200,8 @@ class Tap(object):
     def launch_job(self, query, name=None, output_file=None,
                    output_format="votable", verbose=False,
                    dump_to_file=False, upload_resource=None,
-                   upload_table_name=None):
+                   upload_table_name=None,
+                   autorun=True):
         """Launches a synchronous job
 
         Parameters
@@ -226,13 +227,15 @@ class Tap(object):
         -------
         A Job object
         """
+        # TODO: docstring is missing what other output_format is available.
+        # TODO: I suggest to delegate output manipulation to users
+        #       and just return astropy Table.
         query = taputils.set_top_in_query(query, 2000)
 
-        url = self.tap_endpoint + '/sync'
         args = {
             "REQUEST": "doQuery",
             "LANG": "ADQL",
-            "FORMAT": str(outputFormat),
+            "FORMAT": str(output_format),
             "tapclient": str(TAP_CLIENT_ID),
             "QUERY": str(query)}
         # TODO: is autorun even necessary for sync jobs?
@@ -244,105 +247,82 @@ class Tap(object):
             if upload_table_name is None:
                 raise ValueError("Table name is required when a resource " +
                                  "is uploaded")
+            args['UPLOAD'] = '{0:s},param:{0:s}'.format(upload_table_name)
+            if isinstance(upload_resource, Table):
+                with io.BytesIO() as f:
+                    upload_resource.write(f, format='votable')
+                    f.seek(0)
+                    chunk = f.read().decode()
+                    name = 'pytable'
+                    args['format'] = 'votable'
+            else:
+                with open(upload_resource, "r") as f:
+                    chunk = f.read()
+                name = os.path.basename(upload_resource)
+            files = [[upload_table_name, name, chunk]]
+        
+        url = self.tap_endpoint + '/sync'
+        response = self.session.post(url, args, files=files)
+        return repsonse
 
-
-        uploadValue = str(uploadTableName) + ",param:" + str(uploadTableName)
-        #, "UPLOAD": ""+str(uploadValue) 
-        if isinstance(uploadResource, Table):
-            fh = tempfile.NamedTemporaryFile(delete=False)
-            uploadResource.write(fh, format='votable')
-            fh.close()
-            f = open(fh.name, "r")
-            chunk = f.read()
-            f.close()
-            os.unlink(fh.name)
-            name = 'pytable'
-            args['format'] = 'votable'
-        else:
-            f = open(uploadResource, "r")
-            chunk = f.read()
-            f.close()
-            name = os.path.basename(uploadResource)
-        files = [[uploadTableName, name, chunk]]
-        contentType, body = self.connhandler.encode_multipart(args, files)
-        response = self.connhandler.execute_tappost(context,
-                                                      body,
-                                                      contentType,
-                                                      verbose)
-
-        #     response = self._launchJobMultipart(query,
-        #                                          upload_resource,
-        #                                          upload_table_name,
-        #                                          output_format,
-        #                                          "sync",
-        #                                          verbose,
-        #                                          name)
+        # # handle redirection
+        # if response.status == 303:
+        #     # redirection
+        #     if verbose:
+        #         print("Redirection found")
+        #     location = self.connhandler.find_header(
+        #         response.getheaders(),
+        #         "location")
+        #     if location is None:
+        #         raise requests.exceptions.HTTPError("No location found " +
+        #                                             "after redirection was " +
+        #                                             "received (303)")
+        #     if verbose:
+        #         print("Redirect to %s", location)
+        #     pos = location.find('sync')
+        #     if pos < 0:
+        #         subcontext = location
+        #     else:
+        #         subcontext = location[pos:]
+        #     response = self.connhandler.execute_tapget(subcontext,
+        #                                                  verbose=verbose)
+        # job = Job(async_job=False, query=query, connhandler=self.connhandler)
+        # isError = self.connhandler.check_launch_response_status(response,
+        #                                                           verbose,
+        #                                                           200)
+        # headers = response.getheaders()
+        # suitableOutputFile = self._getSuitableOutputFile(False,
+        #                                                   output_file,
+        #                                                   headers,
+        #                                                   isError,
+        #                                                   output_format)
+        # job.outputFile = suitableOutputFile
+        # job.parameters['format'] = output_format
+        # job.set_response_status(response.status, response.reason)
+        # job.set_phase('PENDING')
+        # if isError:
+        #     job.set_failed(True)
+        #     job.set_phase('ERROR')
+        #     responseBytes = response.read()
+        #     responseStr = responseBytes.decode('utf-8')
+        #     if dump_to_file:
+        #         self.connhandler.dump_to_file(suitableOutputFile,
+        #                                         responseStr)
+        #     raise requests.exceptions.HTTPError(
+        #         taputils.parse_http_response_error(responseStr,
+        #                                            response.status))
         # else:
-        #     response = self._launchJob(query,
-        #                                 output_format,
-        #                                 "sync",
-        #                                 verbose,
-        #                                 name)
-        response = self.session.post(url, data=args)
-
-        # handle redirection
-        if response.status == 303:
-            # redirection
-            if verbose:
-                print("Redirection found")
-            location = self.connhandler.find_header(
-                response.getheaders(),
-                "location")
-            if location is None:
-                raise requests.exceptions.HTTPError("No location found " +
-                                                    "after redirection was " +
-                                                    "received (303)")
-            if verbose:
-                print("Redirect to %s", location)
-            pos = location.find('sync')
-            if pos < 0:
-                subcontext = location
-            else:
-                subcontext = location[pos:]
-            response = self.connhandler.execute_tapget(subcontext,
-                                                         verbose=verbose)
-        job = Job(async_job=False, query=query, connhandler=self.connhandler)
-        isError = self.connhandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  200)
-        headers = response.getheaders()
-        suitableOutputFile = self._getSuitableOutputFile(False,
-                                                          output_file,
-                                                          headers,
-                                                          isError,
-                                                          output_format)
-        job.outputFile = suitableOutputFile
-        job.parameters['format'] = output_format
-        job.set_response_status(response.status, response.reason)
-        job.set_phase('PENDING')
-        if isError:
-            job.set_failed(True)
-            job.set_phase('ERROR')
-            responseBytes = response.read()
-            responseStr = responseBytes.decode('utf-8')
-            if dump_to_file:
-                self.connhandler.dump_to_file(suitableOutputFile,
-                                                responseStr)
-            raise requests.exceptions.HTTPError(
-                taputils.parse_http_response_error(responseStr,
-                                                   response.status))
-        else:
-            if verbose:
-                print("Retrieving sync. results...")
-            if dump_to_file:
-                self.connhandler.dump_to_file(suitableOutputFile, response)
-            else:
-                results = utils.read_http_response(response, output_format)
-                job.set_results(results)
-            if verbose:
-                print("Query finished.")
-            job._phase = 'COMPLETED'
-        return job
+        #     if verbose:
+        #         print("Retrieving sync. results...")
+        #     if dump_to_file:
+        #         self.connhandler.dump_to_file(suitableOutputFile, response)
+        #     else:
+        #         results = utils.read_http_response(response, output_format)
+        #         job.set_results(results)
+        #     if verbose:
+        #         print("Query finished.")
+        #     job._phase = 'COMPLETED'
+        # return job
 
     def launch_job_async(self, query, name=None, output_file=None,
                          output_format="votable", verbose=False,
