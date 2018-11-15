@@ -50,41 +50,31 @@ class Tap(object):
     Provides TAP capabilities
     """
 
-    def __init__(self,
-                 host,
-                 server_context=None,
-                 tap_context=None,
-                 protocol='http',
-                 port=80):
+    def __init__(self, host, path, protocol='http', port=80):
         """Constructor
 
         Parameters
         ----------
-        host : str, optional, default None
+        host : str, required
             host name
-        server_context : str, mandatory, default None
+        path : str, mandatory
             server context
-        tap_context : str, mandatory, default None
-            tap context
+        protocol : str, optional
+            access protocol, usually 'http' or 'https'
         port : int, optional, default '80'
             HTTP port
         """
         self.protocol = protocol
         self.host = host
-        # TODO: is server_context and tap_context ever separately used?
-        self.server_context = server_context if server_context else ''
-        self.tap_context = tap_context if tap_context else ''
+        self.path = path
         self.port = port
         self.session = requests.Session()
 
-        logger.info('{s.host} {s.server_context} {s.tap_context}'.format(s=self))
+        logger.debug('TAP: {:s}'.format(self.tap_endpoint))
     
     @property
     def tap_endpoint(self):
-        logger.debug(self.host)
-        logger.debug(self.server_context)
-        logger.debug(self.tap_context)
-        return "{s.protocol:s}://{s.host:s}/{s.server_context}/{s.tap_context}".format(s=self)
+        return urljoin("{s.protocol:s}://{s.host:s}".format(s=self), self.path)
 
     # TODO: make this a cached property?
     # TODO: actually found this to return private tables, too when logged in.
@@ -448,7 +438,7 @@ class Tap(object):
     @classmethod
     def from_url(cls, url):
         """
-        Make a Tap from url [http(s)://]host[:port][/server_context][/tap_context]
+        Make a Tap from url [http(s)://]host[:port][/path]
         """
         default_port = {'http': 80, 'https':443}
         if '://' not in url:
@@ -460,10 +450,7 @@ class Tap(object):
         if not port:
             port = default_port[protocol]
         path = parsed_url.path
-        server_context = '/'.join(path.split('/')[:-1])
-        tap_context = path.split('/')[-1]
-        return cls(host, server_context=server_context,
-                   tap_context=tap_context, protocol=protocol, port=port)
+        return cls(host, path, protocol=protocol, port=port)
 
     def __str__(self):
         return ("Created TAP+ (v"+VERSION+") - Connection:\n" +
