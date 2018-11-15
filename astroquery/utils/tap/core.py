@@ -243,7 +243,12 @@ class Tap(object):
             args['PHASE'] = 'RUN'
         if name is not None:
             args['jobname'] = name
-        if upload_resource is not None:
+        url = self.tap_endpoint + '/sync'
+        
+        if upload_resource is None:
+            response = self.session.post(url, data=args)
+            return response
+        else:
             if upload_table_name is None:
                 raise ValueError("Table name is required when a resource " +
                                  "is uploaded")
@@ -260,10 +265,11 @@ class Tap(object):
                     chunk = f.read()
                 name = os.path.basename(upload_resource)
             files = [[upload_table_name, name, chunk]]
+            # TODO: post request
+            # response = self.session.post(url, data=args, files=dict(FILE=chunk))
+            # return response
         
-        url = self.tap_endpoint + '/sync'
-        response = self.session.post(url, args, files=files)
-        return repsonse
+        # url = self.tap_endpoint + '/sync'
 
         # # handle redirection
         # if response.status == 303:
