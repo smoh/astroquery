@@ -4,7 +4,7 @@ from astropy.table import Table
 
 @pytest.fixture
 def gaiatap():
-    return Tap("https://gea.esac.esa.int:80/tap-server/tap")
+    return Tap("http://gea.esac.esa.int:80/tap-server/tap")
 
 def test_load_tables(gaiatap):
     gaiatap.load_tables()
@@ -19,3 +19,12 @@ def test_launch_job(gaiatap):
     query = 'select top 5 * from TAP_UPLOAD.mytable;'
     mytable = Table({'a':[1,2,3], 'b':[4,5,6]})
     r = gaiatap.launch_job(query, upload_resource=mytable, upload_table_name='mytable')
+
+
+def test_tap_from_url():
+    tap = Tap.from_url("http://gea.esac.esa.int:80/tap-server/tap")
+    assert tap.protocol == 'http', "Tap has a wrong protocol"
+    assert tap.host == 'gea.esac.esa.int', "Tap has a wrong host"
+    assert tap.port == 80, "Tap has a wrong port"
+    assert tap.server_context == '/tap-server', "Tap has a server_context"
+    assert tap.tap_context == 'tap', "Tap has a tap_context"
