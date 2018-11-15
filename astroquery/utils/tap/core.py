@@ -502,25 +502,6 @@ class Tap(object):
         # response = self.session.post(url, )
         return response
 
-    # def _launchJob(self, query, outputFormat, context, verbose, name=None,
-    #                 autorun=True):
-    #     args = {
-    #         "REQUEST": "doQuery",
-    #         "LANG": "ADQL",
-    #         "FORMAT": str(outputFormat),
-    #         "tapclient": str(TAP_CLIENT_ID),
-    #         "QUERY": str(query)}
-    #     if autorun is True:
-    #         args['PHASE'] = 'RUN'
-    #     if name is not None:
-    #         args['jobname'] = name
-    #     data = self.connhandler.url_encode(args)
-    #     response = self.connhandler.execute_tappost(subcontext=context,
-    #                                                   data=data,
-    #                                                   verbose=verbose)
-        
-    #     return response.content
-
     def _getSuitableOutputFile(self, async_job, outputFile, headers, isError,
                                 output_format):
         dateTime = datetime.now().strftime("%Y%m%d%H%M%S")
