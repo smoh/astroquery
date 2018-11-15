@@ -33,6 +33,7 @@ import os
 from astropy.table.table import Table
 import tempfile
 
+import io
 import requests
 import logging
 logger = logging.getLogger(__name__)
@@ -172,7 +173,8 @@ class Tap(object):
         response = self.session.get("{s.tap_endpoint}/tables".format(s=self))
         if not response.raise_for_status():
             tsp = TableSaxParser()
-            tsp.parseData(response.content)
+            # TODO: this is a stopgap
+            tsp.parseData(io.BytesIO(response.content))
             return tsp.get_tables()
 
     def load_table(self, table):
@@ -192,7 +194,7 @@ class Tap(object):
         response = self.session.get(url)
         if not response.raise_for_status():
             tsp = TableSaxParser()
-            tsp.parseData(response.content)
+            tsp.parseData(io.BytesIO(response.content))
             return tsp.get_table()
 
     def launch_job(self, query, name=None, output_file=None,
