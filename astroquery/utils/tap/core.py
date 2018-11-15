@@ -344,40 +344,6 @@ class Tap(object):
             job.get_results()
         return job
 
-    def list_async_jobs(self, verbose=False):
-        """Returns all the asynchronous jobs
-
-        Parameters
-        ----------
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-
-        Returns
-        -------
-        A list of Job objects
-        """
-        subContext = "async"
-        response = self.connhandler.execute_tapget(subContext,
-                                                     verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        isError = self.connhandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  200)
-        if isError:
-            errMsg = taputils.get_http_response_error(response)
-            print(response.status, errMsg)
-            raise requests.exceptions.HTTPError(errMsg)
-            return None
-        # parse jobs
-        jsp = JobListSaxParser(async_job=True)
-        jobs = jsp.parseData(response)
-        if jobs is not None:
-            for j in jobs:
-                j.connHandler = self.connhandler
-        return jobs
-
     def _getSuitableOutputFile(self, async_job, outputFile, headers, isError,
                                 output_format):
         dateTime = datetime.now().strftime("%Y%m%d%H%M%S")
