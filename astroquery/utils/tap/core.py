@@ -35,6 +35,7 @@ import tempfile
 
 import io
 import requests
+from astropy.extern.six.moves.urllib_parse import urljoin, urlparse
 import logging
 logger = logging.getLogger(__name__)
 
@@ -49,110 +50,33 @@ class Tap(object):
     Provides TAP capabilities
     """
 
-    def __init__(self, url=None,
-                 host=None,
+    def __init__(self,
+                 host,
                  server_context=None,
                  tap_context=None,
-                 upload_context=None,
-                 table_edit_context=None,
-                 data_context=None,
-                 datalink_context=None,
-                 port=80, sslport=443,
-                 default_protocol_is_https=False,
-                 connhandler=None,
-                 verbose=False):
+                 protocol='http',
+                 port=80):
         """Constructor
 
         Parameters
         ----------
-        url : str, mandatory if no host is specified, default None
-            TAP URL
         host : str, optional, default None
             host name
         server_context : str, mandatory, default None
             server context
         tap_context : str, mandatory, default None
             tap context
-        upload_context : str, optional, default None
-            upload context
-        table_edit_context : str, mandatory, default None
-            context for all actions to be performed over a existing table
-        data_context : str, optional, default None
-            data context
-        datalink_context : str, optional, default None
-            datalink context
         port : int, optional, default '80'
             HTTP port
-        sslport : int, optional, default '443'
-            HTTPS port
-        default_protocol_is_https : bool, optional, default False
-            Specifies whether the default protocol to be used is HTTPS
-        connhandler : connection handler object, optional, default None
-            HTTP(s) connection hander (creator). If no handler is provided, a
-            new one is created.
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
         """
-        self.connhandler = None
-        # if connectionHandler is set, use it (useful for testing)
-        if connhandler is not None:
-            self.connhandler = connhandler
-        elif url is not None:
-            protocol, host, port, server, tap = Tap.parse_url(url)
-            if server_context is None:
-                server_context = server
-            if tap_context is None:
-                tap_context = tap
-            if protocol == "http":
-                tap = TapConn(ishttps=False,
-                              host=host,
-                              server_context=server_context,
-                              tap_context=tap_context,
-                              upload_context=upload_context,
-                              table_edit_context=table_edit_context,
-                              data_context=data_context,
-                              datalink_context=datalink_context,
-                              port=port,
-                              sslport=sslport)
-                self.connhandler = tap
-            else:
-                # https port -> sslPort
-                tap = TapConn(ishttps=True,
-                              host=host,
-                              server_context=server_context,
-                              tap_context=tap_context,
-                              upload_context=upload_context,
-                              table_edit_context=table_edit_context,
-                              data_context=data_context,
-                              datalink_context=datalink_context,
-                              port=port,
-                              sslport=port)
-                self.connhandler = tap
-        else:
-            tap = TapConn(ishttps=default_protocol_is_https,
-                          host=host,
-                          server_context=server_context,
-                          tap_context=tap_context,
-                          upload_context=upload_context,
-                          table_edit_context=table_edit_context,
-                          data_context=data_context,
-                          datalink_context=datalink_context,
-                          port=port,
-                          sslport=sslport)
-            self.connhandler = tap
-        # logger.info(
-        #     "host {:s} server {:s} tap {:s}".format(host, server_context, tap_context)
-        # )
-        self.protocol = 'https' if default_protocol_is_https else 'http'
+        self.protocol = protocol
         self.host = host
         # TODO: is server_context and tap_context ever separately used?
         self.server_context = server_context if server_context else ''
         self.tap_context = tap_context if tap_context else ''
-        logger.info('{s.host} {s.server_context} {s.tap_context}'.format(s=self))
         self.session = requests.Session()
-        if verbose:
-            print("Created TAP+ (v" + VERSION + ") - Connection:\n" +
-                  str(self.connhandler))
+
+        logger.info('{s.host} {s.server_context} {s.tap_context}'.format(s=self))
     
     @property
     def tap_endpoint(self):
@@ -520,75 +444,25 @@ class Tap(object):
             fileName += ".error"
         return fileName
 
-    @staticmethod
-    def parse_url(url, verbose=False):
+    @classmethod
+    def from_url(cls, url):
         """
-        Parse TAP url [http(s)://]host[:port][/server_context][/tap_context]
-        
-        Returns (protocol, host, port, serverContext, tapContext)
+        Make a Tap from url [http(s)://]host[:port][/server_context][/tap_context]
         """
-        isHttps = False
-        if url.startswith("https://"):
-            isHttps = True
-            protocol = "https"
-        else:
-            protocol = "http"
-
-        if verbose:
-            print("is https: " + str(isHttps))
-
-        urlInfoPos = url.find("://")
-
-        if urlInfoPos < 0:
-            raise ValueError("Invalid URL format")
-
-        urlInfo = url[(urlInfoPos+3):]
-
-        items = urlInfo.split("/")
-
-        if verbose:
-            print("'" + urlInfo + "'")
-            for i in items:
-                print("'" + i + "'")
-
-        itemsSize = len(items)
-        hostPort = items[0]
-        portPos = hostPort.find(":")
-        if portPos > 0:
-            # port found
-            host = hostPort[0:portPos]
-            port = int(hostPort[portPos+1:])
-        else:
-            # no port found
-            host = hostPort
-            # no port specified: use defaults
-            if isHttps:
-                port = 443
-            else:
-                port = 80
-
-        if itemsSize == 1:
-            serverContext = ""
-            tapContext = ""
-        elif itemsSize == 2:
-            serverContext = "/"+items[1]
-            tapContext = ""
-        elif itemsSize == 3:
-            serverContext = "/"+items[1]
-            tapContext = "/"+items[2]
-        else:
-            data = []
-            for i in range(1, itemsSize-1):
-                data.append("/"+items[i])
-            serverContext = utils.util_create_string_from_buffer(data)
-            tapContext = "/"+items[itemsSize-1]
-        if verbose:
-            print("protocol: '%s'" % protocol)
-            print("host: '%s'" % host)
-            print("port: '%d'" % port)
-            print("server context: '%s'" % serverContext)
-            print("tap context: '%s'" % tapContext)
-        return protocol, host, port, serverContext, tapContext
+        default_port = {'http': 80, 'https':443}
+        if '://' not in url:
+            raise ValueError('`url` must start with "scheme://"')
+        parsed_url = urlparse(url)
+        protocol = parsed_url.scheme
+        host = parsed_url.hostname
+        port = parsed_url.port
+        if not port:
+            port = default_port[protocol]
+        path = parsed_url.path
+        server_context = '/'.join(path.split('/')[:-1])
+        tap_context = path.split('/')[-1]
+        return cls(host, server_context=server_context,
+                   tap_context=tap_context, protocol=protocol, port=port)
 
     def __str__(self):
         return ("Created TAP+ (v"+VERSION+") - Connection:\n" +
