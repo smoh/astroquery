@@ -74,6 +74,7 @@ class Tap(object):
         # TODO: is server_context and tap_context ever separately used?
         self.server_context = server_context if server_context else ''
         self.tap_context = tap_context if tap_context else ''
+        self.port = port
         self.session = requests.Session()
 
         logger.info('{s.host} {s.server_context} {s.tap_context}'.format(s=self))
