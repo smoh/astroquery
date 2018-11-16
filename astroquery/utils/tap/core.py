@@ -344,24 +344,6 @@ class Tap(object):
             job.get_results()
         return job
 
-    def _getSuitableOutputFile(self, async_job, outputFile, headers, isError,
-                                output_format):
-        dateTime = datetime.now().strftime("%Y%m%d%H%M%S")
-        ext = self.connhandler.get_suitable_extension(headers)
-        fileName = ""
-        if outputFile is None:
-            if not async_job:
-                fileName = "sync_" + str(dateTime) + ext
-            else:
-                ext = self.connhandler.get_suitable_extension_by_format(
-                    output_format)
-                fileName = "async_" + str(dateTime) + ext
-        else:
-            fileName = outputFile
-        if isError:
-            fileName += ".error"
-        return fileName
-
     @classmethod
     def from_url(cls, url):
         """
