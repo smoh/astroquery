@@ -291,59 +291,6 @@ class Tap(object):
                         print("Query finished.")
         return job
 
-    def load_async_job(self, jobid=None, name=None, verbose=False,
-                       load_results=True):
-        """Loads an asynchronous job
-
-        Parameters
-        ----------
-        jobid : str, mandatory if no name is provided, default None
-            job identifier
-        name : str, mandatory if no jobid is provided, default None
-            job name
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
-        load_results: bool, optional, default 'True'
-            load results associated to this job
-
-        Returns
-        -------
-        A Job object
-        """
-        if name is not None:
-            jobfilter = Filter()
-            jobfilter.add_filter('name', name)
-            jobs = self.search_async_jobs(jobfilter)
-            if jobs is None or len(jobs) < 1:
-                print("No job found for name '"+str(name)+"'")
-                return None
-            jobid = jobs[0].get_jobid()
-        if jobid is None:
-            print("No job identifier found")
-            return None
-        subContext = "async/" + str(jobid)
-        response = self.connhandler.execute_tapget(subContext,
-                                                     verbose=verbose)
-        if verbose:
-            print(response.status, response.reason)
-            print(response.getheaders())
-        isError = self.connhandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  200)
-        if isError:
-            errMsg = taputils.get_http_response_error(response)
-            print(response.status, errMsg)
-            raise requests.exceptions.HTTPError(errMsg)
-            return None
-        # parse job
-        jsp = JobSaxParser(async_job=True)
-        job = jsp.parseData(response)[0]
-        job.connHandler = self.connhandler
-        # load resulst
-        if load_results:
-            job.get_results()
-        return job
-
     @classmethod
     def from_url(cls, url):
         """
@@ -1690,4 +1637,57 @@ class TapPlus(Tap):
                 if i.startswith("JSESSIONID="):
                     return i
         return None
+
+    def load_async_job(self, jobid=None, name=None, verbose=False,
+                       load_results=True):
+        """Loads an asynchronous job
+
+        Parameters
+        ----------
+        jobid : str, mandatory if no name is provided, default None
+            job identifier
+        name : str, mandatory if no jobid is provided, default None
+            job name
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+        load_results: bool, optional, default 'True'
+            load results associated to this job
+
+        Returns
+        -------
+        A Job object
+        """
+        if name is not None:
+            jobfilter = Filter()
+            jobfilter.add_filter('name', name)
+            jobs = self.search_async_jobs(jobfilter)
+            if jobs is None or len(jobs) < 1:
+                print("No job found for name '"+str(name)+"'")
+                return None
+            jobid = jobs[0].get_jobid()
+        if jobid is None:
+            print("No job identifier found")
+            return None
+        subContext = "async/" + str(jobid)
+        response = self.connhandler.execute_tapget(subContext,
+                                                     verbose=verbose)
+        if verbose:
+            print(response.status, response.reason)
+            print(response.getheaders())
+        isError = self.connhandler.check_launch_response_status(response,
+                                                                  verbose,
+                                                                  200)
+        if isError:
+            errMsg = taputils.get_http_response_error(response)
+            print(response.status, errMsg)
+            raise requests.exceptions.HTTPError(errMsg)
+            return None
+        # parse job
+        jsp = JobSaxParser(async_job=True)
+        job = jsp.parseData(response)[0]
+        job.connHandler = self.connhandler
+        # load resulst
+        if load_results:
+            job.get_results()
+        return job
 
