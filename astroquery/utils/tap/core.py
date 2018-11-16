@@ -112,6 +112,7 @@ class Tap(object):
             tsp.parseData(io.BytesIO(response.content))
             return tsp.get_table()
 
+    # TODO: clean up all dump_to_file leftover
     def launch_job(self, query, name=None, output_file=None,
                    output_format="votable", verbose=False,
                    dump_to_file=False, upload_resource=None,
