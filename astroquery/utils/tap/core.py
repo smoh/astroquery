@@ -259,6 +259,10 @@ class Tap(object):
         path = parsed_url.path
         return cls(host, path, protocol=protocol, port=port)
 
+    def __repr__(self):
+        return '{cls:s}("{s.host:s}", "{s.path:s}", "{s.protocol:s}", {s.port:d})'\
+            .format(s=self, cls=self.__class__.__name__)
+
     def __str__(self):
         return ("Created TAP+ (v"+VERSION+") - Connection:\n" +
                 str(self.connhandler))
