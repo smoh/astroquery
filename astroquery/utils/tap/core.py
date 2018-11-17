@@ -68,13 +68,7 @@ class Tap(object):
         self.host = host
         self.path = path
         self.port = port
-        s = requests.session()
-        # TODO: not clear if this is necessary
-        s.headers.update({
-            'Content-type': 'application/x-www-form-urlencoded',
-            'Accept': 'text/plain'
-        })
-        self.session = s
+        self.session = requests.session()
 
         logger.debug('TAP: {:s}'.format(self.tap_endpoint))
     
@@ -167,7 +161,7 @@ class Tap(object):
             args['PHASE'] = 'RUN'
         if name is not None:
             args['jobname'] = name
-        url = self.tap_endpoint + '/async' if async_ else '/async'
+        url = self.tap_endpoint + ('/async' if async_ else '/sync')
         
         if upload_resource is None:
             response = self.session.post(url, data=args)
@@ -193,10 +187,11 @@ class Tap(object):
             #       If not, remove variable `name`.
             files = {upload_table_name: chunk}
             response = self.session.post(url, data=args, files=files)
+            return response
 
         # TODO: return parsed results eventually.
-        if not response.raise_for_status():
-            return response
+        # if not response.raise_for_status():
+        #     return response
     
     def query(self, query, name=None, upload_resource=None, upload_table_name=None):
         """
@@ -273,9 +268,7 @@ class TapPlus(Tap):
     """TAP plus class
     Provides TAP and TAP+ capabilities
     """
-    def __init__(self, url=None,
-                 host=None,
-                 server_context=None,
+    def __init__(self, host=None, server_context=None,
                  tap_context=None,
                  upload_context=None,
                  table_edit_context=None,
