@@ -273,16 +273,17 @@ class TapPlus(Tap):
     Provides TAP and TAP+ capabilities
     """
     def __init__(self, host, path, protocol='http', port=80,
-                 upload_context=None,
-                 table_edit_context=None,
-                 data_context=None,
-                 datalink_context=None):
+                 server_context=None, upload_context=None):
+                #  table_edit_context=None, data_context=None,
+                #  datalink_context=None):
         """Constructor
 
         Parameters
         ----------
         host : str, optional, default None
             host name
+        server_context : str, optional, default None
+            server context
         upload_context : str, optional, default None
             upload context
         table_edit_context : str, optional, default None
@@ -291,22 +292,22 @@ class TapPlus(Tap):
             data context
         datalink_context : str, optional, default None
             datalink context
-        port : int, optional, default '80'
-            HTTP port
-        sslport : int, optional, default '443'
-            HTTPS port
-        default_protocol_is_https : bool, optional, default False
-            Specifies whether the default protocol to be used is HTTPS
-        connhandler connection handler object, optional, default None
-            HTTP(s) connection hander (creator). If no handler is provided, a
-            new one is created.
         verbose : bool, optional, default 'True'
             flag to display information about the process
         """
 
         super(TapPlus, self).__init__(host, path, protocol='http', port=80)
 
-        self.isLoggedIn = False
+        if not all([v is not None for v in [server_context, upload_context]]):
+            raise ValueError(
+                "It does not make sense to initialize `TapPlus`"
+                "without all contexts set. Consider using `Tap`.")
+
+        self.server_context = server_context
+        self.upload_context = upload_context
+        # self.table_edit_context = table_edit_context
+        # self.data_context = data_context
+        # self.datalink_context = datalink_context
     
     def login(self, user=None, password=None, credentials_file=None,
               verbose=False):
@@ -344,8 +345,8 @@ class TapPlus(Tap):
             if password is None:
                 print("Invalid password")
                 return
-        r = self.session.post("https://{s.host:s}/tap-server/login".format(s=self),
-                              data={'username': user, 'password': password})
+        url = "https://{s.host:s}/{s.server_context:s}/login".format(s=self)
+        r = self.session.post(url, data={'username': user, 'password': password})
         if not r.raise_for_status():
             return
     
@@ -353,6 +354,58 @@ class TapPlus(Tap):
         """
         Logout from TAP server
         """
-        r = self.session.post("https://{s.host:s}/tap-server/logout".format(s=self))
+        url = "https://{s.host:s}/{s.server_context:s}/logout".format(s=self)
+        r = self.session.post(url)
         if not r.raise_for_status():
             return
+    
+    @property
+    def baseurl(self):
+        return '{s.protocol:s}://{s.host:s}/{s.server_context:s}'.format(s=self)
+
+    def upload_table(self, upload_resource, table_name,
+                     table_description="",
+                     format='votable', verbose=False):
+        """
+        Upload a table to the user private space
+
+        Parameters
+        ----------
+        upload_resource : object
+            table to be uploaded: pyTable, file or URL.
+        table_name: str
+            table name associated to the uploaded resource
+        table_description: str, optional
+            table description
+        format : str, optional
+            resource format
+            Available formats: 'VOTable', 'CSV' and 'ASCII'
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+        """
+        # TODO: available froamts from http://gea.esac.esa.int/archive-help/index.html
+        #       where else is TapPlus applicable?
+        url = "{s.baseurl:s}/{s.upload_context}".format(s=self)
+        # url = "https://gea.esac.esa.int/tap-server/Upload"
+        logger.debug("upload_table url = {:s}".format(url))
+        args = {
+            'TABLE_NAME': table_name,
+            'TABLE_DESC': table_description,
+            'FORMAT': format
+        }
+        if isinstance(upload_resource, Table):
+            with io.BytesIO() as f:
+                upload_resource.write(f, format='votable')
+                f.seek(0)
+                chunk = f.read()
+                args['FORMAT'] = 'votable'
+                files = dict(FILE=chunk)
+        elif upload_resource.startswith('http'):
+            files = None
+            args['URL'] = upload_resource
+        else:
+            with open(upload_resource, "r") as f:
+                chunk = f.read()
+            files = dict(FILE=chunk)
+        r = self.session.post(url, data=args, files=files)
+        return r
