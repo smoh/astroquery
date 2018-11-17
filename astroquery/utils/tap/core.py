@@ -68,7 +68,13 @@ class Tap(object):
         self.host = host
         self.path = path
         self.port = port
-        self.session = requests.Session()
+        s = requests.session()
+        # TODO: not clear if this is necessary
+        s.headers.update({
+            'Content-type': 'application/x-www-form-urlencoded',
+            'Accept': 'text/plain'
+        })
+        self.session = s
 
         logger.debug('TAP: {:s}'.format(self.tap_endpoint))
     
@@ -113,12 +119,12 @@ class Tap(object):
             return tsp.get_table()
 
     # TODO: clean up all dump_to_file leftover
-    def launch_job(self, query, name=None, output_file=None,
+    def _post_query(self, query, name=None, output_file=None,
                    output_format="votable", verbose=False,
-                   dump_to_file=False, upload_resource=None,
-                   upload_table_name=None,
-                   autorun=True):
-        """Launches a synchronous job
+                   upload_resource=None, upload_table_name=None,
+                   async_=False,
+                   dump_to_file=False, autorun=True):
+        """POST synchronous or asynchronos query to Tap server
 
         Parameters
         ----------
@@ -131,6 +137,8 @@ class Tap(object):
             results format
         verbose : bool, optional, default 'False'
             flag to display information about the process
+        async_ : bool
+            send asynchronous query if True
         dump_to_file : bool, optional, default 'False'
             if True, the results are saved in a file instead of using memory
         upload_resource: str, optional, default None
@@ -141,7 +149,7 @@ class Tap(object):
 
         Returns
         -------
-        A Job object
+        response : requests.Response
         """
         # TODO: docstring is missing what other output_format is available.
         # TODO: I suggest to delegate output manipulation to users
@@ -159,7 +167,7 @@ class Tap(object):
             args['PHASE'] = 'RUN'
         if name is not None:
             args['jobname'] = name
-        url = self.tap_endpoint + '/sync'
+        url = self.tap_endpoint + '/async' if async_ else '/async'
         
         if upload_resource is None:
             response = self.session.post(url, data=args)
@@ -189,8 +197,17 @@ class Tap(object):
         # TODO: return parsed results eventually.
         if not response.raise_for_status():
             return response
+    
+    def query(self, query, name=None, upload_resource=None, upload_table_name=None):
+        """
+        Synchronous query to TAP server
+        """
+        r = self._post_query(query, name=name, upload_resource=upload_resource,
+                             upload_table_name=upload_table_name)
+        #TODO parse response and return results
+        return r
 
-    def launch_job_async(self, query, name=None, output_file=None,
+    def query_async(self, query, name=None, output_file=None,
                          output_format="votable", verbose=False,
                          dump_to_file=False, background=False,
                          upload_resource=None, upload_table_name=None,
@@ -226,71 +243,9 @@ class Tap(object):
         -------
         A Job object
         """
-        if verbose:
-            print("Launched query: '"+str(query)+"'")
-        if upload_resource is not None:
-            if upload_table_name is None:
-                raise ValueError(
-                    "Table name is required when a resource is uploaded")
-            response = self._launchJobMultipart(query,
-                                                 upload_resource,
-                                                 upload_table_name,
-                                                 output_format,
-                                                 "async",
-                                                 verbose,
-                                                 name,
-                                                 autorun)
-        else:
-            response = self._launchJob(query,
-                                        output_format,
-                                        "async",
-                                        verbose,
-                                        name,
-                                        autorun)
-        isError = self.connhandler.check_launch_response_status(response,
-                                                                  verbose,
-                                                                  303)
-        job = Job(async_job=True, query=query, connhandler=self.connhandler)
-        headers = response.getheaders()
-        suitableOutputFile = self._getSuitableOutputFile(True,
-                                                          output_file,
-                                                          headers,
-                                                          isError,
-                                                          output_format)
-        job.outputFile = suitableOutputFile
-        job.set_response_status(response.status, response.reason)
-        job.parameters['format'] = output_format
-        job.set_phase('PENDING')
-        if isError:
-            job.set_failed(True)
-            job.set_phase('ERROR')
-            if dump_to_file:
-                responseBytes = response.read()
-                responseStr = responseBytes.decode('utf-8')
-                self.connhandler.dump_to_file(suitableOutputFile,
-                                                responseStr)
-            raise requests.exceptions.HTTPError(response.reason)
-        else:
-            location = self.connhandler.find_header(
-                response.getheaders(),
-                "location")
-            jobid = taputils.get_jobid_from_location(location)
-            if verbose:
-                print("job " + str(jobid) + ", at: " + str(location))
-            job.jobid = jobid
-            job.remoteLocation = location
-            if autorun is True:
-                job.set_phase('EXECUTING')
-                if not background:
-                    if verbose:
-                        print("Retrieving async. results...")
-                    # saveResults or getResults will block (not background)
-                    if dump_to_file:
-                        job.save_results(verbose)
-                    else:
-                        job.get_results()
-                        print("Query finished.")
-        return job
+        r = self._post_query(query, name=name, async_=True)
+        # TODO: parse response and return Job
+        return r
 
     @classmethod
     def from_url(cls, url):
