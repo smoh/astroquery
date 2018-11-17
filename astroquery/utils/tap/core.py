@@ -388,7 +388,12 @@ class TapPlus(Tap):
         url = "{s.baseurl:s}/{s.upload_context}".format(s=self)
         # url = "https://gea.esac.esa.int/tap-server/Upload"
         logger.debug("upload_table url = {:s}".format(url))
+        # TODO: WOW. It actaully seems necessary to pass on TASKID
+        # Otherwise you will get 500 Internal server error.
+        # This is confirmed even with curl in command line.
+        # This is not docummented in gaia help page.
         args = {
+            'TASKID': str(-1),
             'TABLE_NAME': table_name,
             'TABLE_DESC': table_description,
             'FORMAT': format
