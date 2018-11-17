@@ -353,4 +353,6 @@ class TapPlus(Tap):
         """
         Logout from TAP server
         """
-        return self.session.post("https://{s.host:s}/tap-server/logout".format(s=self))
+        r = self.session.post("https://{s.host:s}/tap-server/logout".format(s=self))
+        if not r.raise_for_status():
+            return
