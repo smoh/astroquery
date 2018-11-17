@@ -272,7 +272,7 @@ class TapPlus(Tap):
     """TAP plus class
     Provides TAP and TAP+ capabilities
     """
-    def __init__(self, host, path, protocol='http', port=80,
+    def __init__(self, host, path, protocol='https', port=443,
                  server_context=None, upload_context=None):
                 #  table_edit_context=None, data_context=None,
                 #  datalink_context=None):
@@ -296,7 +296,7 @@ class TapPlus(Tap):
             flag to display information about the process
         """
 
-        super(TapPlus, self).__init__(host, path, protocol='http', port=80)
+        super(TapPlus, self).__init__(host, path, protocol=protocol, port=port)
 
         if not all([v is not None for v in [server_context, upload_context]]):
             raise ValueError(
