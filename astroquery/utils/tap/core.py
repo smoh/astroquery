@@ -187,11 +187,9 @@ class Tap(object):
             #       If not, remove variable `name`.
             files = {upload_table_name: chunk}
             response = self.session.post(url, data=args, files=files)
-            return response
 
-        # TODO: return parsed results eventually.
-        # if not response.raise_for_status():
-        #     return response
+        if not response.raise_for_status():
+            return response
     
     def query(self, query, name=None, upload_resource=None, upload_table_name=None):
         """
