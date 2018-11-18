@@ -361,6 +361,36 @@ class TapPlus(Tap):
     def baseurl(self):
         return '{s.protocol:s}://{s.host:s}/{s.server_context:s}'.format(s=self)
 
+    def load_tables(self, only_tables=False, include_shared_tables=False):
+        """
+        Load all accessible tables
+
+        Parameters
+        ----------
+        only_tables : bool, TAP+ only, optional, default 'False'
+            True to load table names only
+        include_shared_tables : bool, TAP+, optional, default 'False'
+            True to include shared tables
+
+        Returns
+        -------
+        A list of table objects
+        """
+        url = "{s.tap_endpoint}/tables".format(s=self)
+        logger.debug("tables url = {:s}".format(url))
+
+        payload = dict(
+            only_tables=only_tables,
+            share_accessible=True if include_shared_tables else False
+        )
+        r = self.session.get(url, params=payload)
+
+        if not r.raise_for_status():
+            tsp = TableSaxParser()
+            # TODO: this is a stopgap
+            tsp.parseData(io.BytesIO(r.content))
+        return tsp.get_tables()
+
     def upload_table(self, upload_resource, table_name,
                      table_description="",
                      format='votable'):
