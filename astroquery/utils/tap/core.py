@@ -410,3 +410,30 @@ class TapPlus(Tap):
             files = dict(FILE=chunk)
         r = self.session.post(url, data=args, files=files)
         return r
+
+    def delete_user_table(self, table_name, force_removal=False,
+                          verbose=False):
+        """
+        Remove a user table
+
+        Parameters
+        ----------
+        table_name: str
+            table to be removed
+        force_removal : bool, optional, default 'False'
+            flag to indicate if removal should be forced
+        verbose : bool, optional, default 'False'
+            flag to display information about the process
+        """
+        url = "{s.baseurl:s}/{s.upload_context}".format(s=self)
+
+        # TODO: what does force removal mean?
+        args = {
+            "TABLE_NAME": str(table_name),
+            "DELETE": "TRUE",
+            "FORCE_REMOVAL": "TRUE" if force_removal else "FALSE"
+        }
+
+        r = self.session.post(url, data=args)
+        if not r.raise_for_status():
+            return r
