@@ -272,7 +272,7 @@ class TapPlus(Tap):
     """TAP plus class
     Provides TAP and TAP+ capabilities
     """
-    def __init__(self, host, path, protocol='https', port=443,
+    def __init__(self, host, path, protocol='http', port=80,
                  server_context=None, upload_context=None):
                 #  table_edit_context=None, data_context=None,
                 #  datalink_context=None):
@@ -365,7 +365,7 @@ class TapPlus(Tap):
 
     def upload_table(self, upload_resource, table_name,
                      table_description="",
-                     format='votable', verbose=False):
+                     format='votable'):
         """
         Upload a table to the user private space
 
@@ -380,8 +380,6 @@ class TapPlus(Tap):
         format : str, optional
             resource format
             Available formats: 'VOTable', 'CSV' and 'ASCII'
-        verbose : bool, optional, default 'False'
-            flag to display information about the process
         """
         # TODO: available froamts from http://gea.esac.esa.int/archive-help/index.html
         #       where else is TapPlus applicable?
