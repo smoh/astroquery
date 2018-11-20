@@ -268,8 +268,8 @@ class Tap(object):
 
 
 class GaiaTapPlus(Tap):
-    """TAP plus class
-    Provides TAP and TAP+ capabilities
+    """
+    Gaia TAP+ Service
     """
     def __init__(self, host, path, protocol='http', port=80,
                  server_context=None, upload_context=None):
@@ -295,7 +295,7 @@ class GaiaTapPlus(Tap):
             flag to display information about the process
         """
 
-        super(TapPlus, self).__init__(host, path, protocol=protocol, port=port)
+        super(GaiaTapPlus, self).__init__(host, path, protocol=protocol, port=port)
 
         if not all([v is not None for v in [server_context, upload_context]]):
             raise ValueError(
