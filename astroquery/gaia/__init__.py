@@ -15,7 +15,7 @@ Created on 30 jun. 2016
 
 """
 
-from astroquery.utils.tap.core import TapPlus
+from .core import GaiaTapPlus
 from astropy import config as _config
 
 
@@ -35,7 +35,4 @@ class Conf(_config.ConfigNamespace):
 conf = Conf()
 
 
-from .core import Gaia, GaiaClass
-
-
-__all__ = ['Gaia', 'GaiaClass', 'Conf', 'conf']
+__all__ = ['GaiaTapPlus', 'Conf', 'conf']
