@@ -27,45 +27,6 @@ TAP_UTILS_HTTP_VOTABLE_ERROR = '<INFO name="QUERY_STATUS" value="ERROR">'
 TAP_UTILS_VOTABLE_INFO = '</INFO>'
 
 
-def taputil_find_header(headers, key):
-    """Searches for the specified keyword
-
-    Parameters
-    ----------
-    headers : HTTP(s) headers object, mandatory
-        HTTP(s) response headers
-    key : str, mandatory
-        header key to be searched for
-
-    Returns
-    -------
-    The requested header value or None if the header is not found
-    """
-    for entry in headers:
-        if key.lower() == entry[0].lower():
-            return entry[1]
-    return None
-
-
-def taputil_create_sorted_dict_key(dictionaryObject):
-    """Searches for the specified keyword
-
-    Parameters
-    ----------
-    dictionaryObject : dictionary object, mandatory
-        Dictionary
-
-    Returns
-    -------
-    A keyword based on a sorted dictionary key+value items
-    """
-    if dictionaryObject is None:
-        return None
-    listTmp = []
-    for k in sorted(dictionaryObject):
-        listTmp.append(str(k) + '=' + str(dictionaryObject[k]))
-    return '&'.join(listTmp)
-
 
 def set_top_in_query(query, top):
     """Adds TOP statement if the query does not have one.
@@ -102,23 +63,6 @@ def set_top_in_query(query, top):
             p = q.find("SELECT ")
             nq = query[0:p+7] + " TOP " + str(top) + " " + query[p+7:]
         return nq
-
-
-def get_http_response_error(response):
-    """Extracts an HTTP error message from an HTML response.
-
-    Parameters
-    ----------
-    response : HTTP response, mandatory
-        HTTP response
-
-    Returns
-    -------
-    A string with the response error message.
-    """
-    responseBytes = response.read()
-    responseStr = responseBytes.decode('utf-8')
-    return parse_http_response_error(responseStr, response.status)
 
 
 def parse_http_response_error(responseStr, status):
@@ -165,21 +109,6 @@ def parse_http_votable_response_error(responseStr, status):
     return str("Error " + str(status) + ": " + msg)
 
 
-def get_jobid_from_location(location):
-    """Extracts an HTTP error message from an VO response.
-
-    Parameters
-    ----------
-    location : HTTP VO 303 response location header, mandatory
-        HTTP VO redirection location
-
-    Returns
-    -------
-    A jobid.
-    """
-    pos = location.rfind('/')+1
-    jobid = location[pos:]
-    return jobid
 
 
 def get_schema_name(full_qualified_table_name):
