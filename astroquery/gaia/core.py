@@ -17,6 +17,7 @@ Created on 30 jun. 2016
 
 import six
 import requests
+from requests.exceptions import HTTPError
 import getpass
 import os
 import io
@@ -29,14 +30,15 @@ from astropy.extern.six.moves.urllib_parse import urljoin, urlparse
 
 from astroquery.utils import commons
 from astroquery.gaia import taputils
+from astroquery.gaia import utils
 from astroquery.gaia.xmlparser.tableSaxParser import TableSaxParser
 from astroquery.gaia.xmlparser.jobListSaxParser import JobListSaxParser
-from astroquery.gaia.xmlparser.groupSaxParser import GroupSaxParser
-from astroquery.gaia.xmlparser.sharedItemsSaxParser import SharedItemsSaxParser  # noqa
+# from astroquery.gaia.xmlparser.groupSaxParser import GroupSaxParser
+# from astroquery.gaia.xmlparser.sharedItemsSaxParser import SharedItemsSaxParser  # noqa
 from astroquery.gaia.model.job import Job
 from astroquery.gaia.model.filter import Filter
 from astroquery.gaia.gui.login import LoginDialog
-from . import conf
+# from . import conf
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,7 @@ class Tap(object):
     """TAP class
     Provides TAP capabilities
     """
+    _tables = None
 
     def __init__(self, host, path, protocol='http', port=80):
         """Constructor
@@ -76,42 +79,33 @@ class Tap(object):
     @property
     def tap_endpoint(self):
         return urljoin("{s.protocol:s}://{s.host:s}".format(s=self), self.path)
+    
+    @staticmethod
+    def parse_tableset(xml):
+        """
+        Parse vod:tableset XML and return a list of tables
+        
+        Returns TODO
+        """
+        return utils.parse_tableset(xml)
 
-    # TODO: make this a cached property?
     # TODO: actually found this to return private tables, too when logged in.
-    def load_tables(self):
+    @property
+    def tables(self):
         """Loads all public tables
 
         Returns
         -------
         A list of table objects
         """
-        response = self.session.get("{s.tap_endpoint}/tables".format(s=self))
-        if not response.raise_for_status():
-            tsp = TableSaxParser()
-            # TODO: this is a stopgap
-            tsp.parseData(io.BytesIO(response.content))
-            return tsp.get_tables()
-
-    def load_table(self, table):
-        """Loads the specified table
-
-        Parameters
-        ----------
-        table : str, mandatory
-            full qualified table name (i.e. schema name + table name)
-
-        Returns
-        -------
-        A table object
-        """
-        url = "{s.tap_endpoint:s}/tables?tables={table:s}".format(
-            s=self, table=table)
-        response = self.session.get(url)
-        if not response.raise_for_status():
-            tsp = TableSaxParser()
-            tsp.parseData(io.BytesIO(response.content))
-            return tsp.get_table()
+        if self._tables is None:
+            response = self.session.get("{s.tap_endpoint}/tables".format(s=self))
+            if not response.raise_for_status():
+                tables = Tap.parse_tableset(response.text)
+                self._tables = tables
+                return tables
+        else:
+            return self._tables
 
     # TODO: clean up all dump_to_file leftover
     def _post_query(self, query, name=None, output_file=None,
@@ -391,6 +385,31 @@ class GaiaTapPlus(Tap):
             # TODO: this is a stopgap
             tsp.parseData(io.BytesIO(r.content))
         return tsp.get_tables()
+
+    def load_table(self, table):
+        """Loads the specified table
+
+        Parameters
+        ----------
+        table : str, mandatory
+            full qualified table name (i.e. schema name + table name)
+
+        Returns
+        -------
+        A table object
+        """
+        url = "{s.tap_endpoint:s}/tables?tables={table:s}".format(
+            s=self, table=table)
+        response = self.session.get(url)
+        try:
+            response.raise_for_status()
+            tsp = TableSaxParser()
+            tsp.parseData(io.BytesIO(response.content))
+            return tsp.get_table()
+        except HTTPError as e:
+            useful_error_message = parse_html_response_error(response.text)
+            e.message += '\n' + useful_error_message
+            raise e
 
     def upload_table(self, upload_resource, table_name,
                      table_description="",
